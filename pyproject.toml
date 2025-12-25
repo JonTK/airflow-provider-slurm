@@ -4,7 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "airflow-slurm-executor"
-dynamic = ["version", "description"]
+description = "Slurm executor for Apache Airflow using REST API"
+dynamic = ["version"]
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "Apache-2.0"}
@@ -33,7 +34,6 @@ Issues = "https://github.com/jontk/airflow-slurm-executor/issues"
 
 [tool.setuptools.dynamic]
 version = {attr = "airflow_slurm_executor.version.__version__"}
-description = {attr = "airflow_slurm_executor.version.__description__"}
 
 [tool.black]
 line-length = 88
@@ -85,11 +85,6 @@ python_functions = ["test_*"]
 addopts = [
     "-ra",
     "--strict-markers",
-    "--cov=airflow_slurm_executor",
-    "--cov-branch",
-    "--cov-report=term-missing:skip-covered",
-    "--cov-report=html",
-    "--cov-report=xml",
 ]
 
 [tool.coverage.run]

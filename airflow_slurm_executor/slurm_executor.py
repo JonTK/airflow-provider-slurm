@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from airflow import conf
+from airflow.configuration import conf
 from airflow.executors.base_executor import BaseExecutor
 from airflow.models.taskinstance import TaskInstance, TaskInstanceKey
 from airflow.utils.state import TaskInstanceState
@@ -248,8 +248,12 @@ class SlurmExecutor(BaseExecutor):
         
         Format: airflow-{dag_id}-{task_id}-{run_id_hash}-{try_number}
         """
-        # Get run_id (available in Airflow 2.2+)
-        run_id = getattr(key, "run_id", str(key.execution_date))
+        # Get run_id (standard in Airflow 3.x, fallback for older versions)
+        run_id = getattr(key, "run_id", None)
+        if run_id is None:
+            # Fallback for older Airflow versions
+            execution_date = getattr(key, "execution_date", None)
+            run_id = str(execution_date) if execution_date else "unknown"
         
         # Hash run_id for compactness
         run_id_hash = hashlib.sha256(run_id.encode()).hexdigest()[:8]
@@ -315,8 +319,16 @@ class SlurmExecutor(BaseExecutor):
         # Build path components
         dag_id = key.dag_id
         task_id = key.task_id
-        execution_date = key.execution_date.strftime("%Y-%m-%dT%H:%M:%S%z")
         try_number = key.try_number
+        
+        # Handle run_id (Airflow 3.x) or execution_date (older versions)
+        if hasattr(key, "run_id"):
+            # Use run_id for Airflow 3.x
+            execution_date_str = key.run_id
+        else:
+            # Fallback for older versions
+            execution_date = getattr(key, "execution_date", None)
+            execution_date_str = execution_date.strftime("%Y-%m-%dT%H:%M:%S%z") if execution_date else "unknown"
         
         # Construct path
         log_path = os.path.join(
@@ -324,7 +336,7 @@ class SlurmExecutor(BaseExecutor):
             "dags",
             dag_id,
             task_id,
-            execution_date,
+            execution_date_str,
             f"{try_number}.log"
         )
         

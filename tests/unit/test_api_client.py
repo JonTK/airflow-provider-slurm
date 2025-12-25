@@ -159,8 +159,8 @@ class TestSlurmAPIClient:
         result = api_client.get_jobs(job_ids=[123, 124])
         assert len(result["jobs"]) == 1
         
-        # Verify query parameter
-        assert "job_id=123,124" in responses.calls[0].request.url
+        # Verify query parameter (URL encoded)
+        assert "job_id=123%2C124" in responses.calls[0].request.url
 
     @responses.activate
     def test_get_job_found(self, api_client):
