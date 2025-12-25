@@ -65,7 +65,7 @@ class TestSlurmExecutor:
         return TaskInstanceKey(
             dag_id="test_dag",
             task_id="test_task",
-            execution_date=datetime(2024, 1, 1),
+            run_id="2024-01-01T00:00:00+00:00",
             try_number=1,
         )
 
@@ -153,11 +153,17 @@ class TestSlurmExecutor:
         executor.fail.assert_called_once_with(task_key)
         assert task_key not in executor.running
 
-    def test_build_job_name(self, executor, task_key):
+    def test_build_job_name(self, executor):
         """Test job name generation."""
-        # Mock run_id attribute
-        with patch.object(task_key, "run_id", "manual__2024-01-01"):
-            job_name = executor._build_job_name(task_key)
+        # Create task key with specific run_id
+        task_key = TaskInstanceKey(
+            dag_id="test_dag",
+            task_id="test_task",
+            run_id="manual__2024-01-01",
+            try_number=1,
+        )
+        
+        job_name = executor._build_job_name(task_key)
         
         assert job_name.startswith("airflow-test_dag-test_task-")
         assert job_name.endswith("-1")  # try_number
@@ -169,7 +175,7 @@ class TestSlurmExecutor:
         long_key = TaskInstanceKey(
             dag_id="a" * 200,
             task_id="b" * 200,
-            execution_date=datetime(2024, 1, 1),
+            run_id="2024-01-01T00:00:00+00:00",
             try_number=1,
         )
         
@@ -210,7 +216,7 @@ class TestSlurmExecutor:
         """Test log path generation."""
         log_path = executor._get_log_path(task_key)
         
-        expected_path = "/tmp/airflow/logs/dags/test_dag/test_task/2024-01-01T00:00:00/1.log"
+        expected_path = "/tmp/airflow/logs/dags/test_dag/test_task/2024-01-01T00:00:00+00:00/1.log"
         assert log_path == expected_path
         mock_makedirs.assert_called_once()
 
@@ -415,10 +421,10 @@ class TestSlurmExecutor:
         """Test task adoption after scheduler restart."""
         # Create task instances to adopt
         ti1 = MagicMock()
-        ti1.key = TaskInstanceKey("dag1", "task1", datetime(2024, 1, 1), 1)
+        ti1.key = TaskInstanceKey("dag1", "task1", "2024-01-01T00:00:00+00:00", 1)
         
         ti2 = MagicMock()
-        ti2.key = TaskInstanceKey("dag2", "task2", datetime(2024, 1, 1), 1)
+        ti2.key = TaskInstanceKey("dag2", "task2", "2024-01-01T00:00:00+00:00", 1)
         
         # Mock Slurm jobs
         mock_client = MagicMock()
