@@ -332,6 +332,14 @@ class SlurmExecutor(BaseExecutor):
         """Build environment variables for job."""
         env = os.environ.copy()
         
+        # Ensure critical system variables are set
+        if "PATH" not in env:
+            env["PATH"] = "/usr/local/bin:/usr/bin:/bin"
+        if "USER" not in env:
+            env["USER"] = os.environ.get("USER", "airflow")
+        if "HOME" not in env:
+            env["HOME"] = os.path.expanduser("~")
+        
         # Ensure critical Airflow variables are set
         env.update({
             "AIRFLOW_HOME": self.airflow_home,

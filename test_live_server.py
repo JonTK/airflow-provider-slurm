@@ -82,7 +82,7 @@ def test_live_server():
         print("\\n   Testing job submission...")
         try:
             test_job_spec = {
-                "script": "#!/bin/bash\\necho 'Airflow Slurm Executor Test Job'\\nsleep 2\\necho 'Test completed successfully'",
+                "script": "#!/bin/bash\\necho 'Airflow Slurm Executor Test Job'\\necho 'Working directory:' $(pwd)\\necho 'User:' $(whoami)\\nsleep 2\\necho 'Test completed successfully'",
                 "job": {
                     "name": "airflow-executor-test",
                     "partition": "debug",  # Use debug partition (30 min limit)
@@ -91,6 +91,13 @@ def test_live_server():
                     "memory_per_node": "100M",
                     "time_limit": 60,  # 60 seconds (1 minute)
                     "current_working_directory": "/tmp",
+                    "environment": {
+                        "PATH": "/usr/local/bin:/usr/bin:/bin",
+                        "USER": "root",
+                        "HOME": "/root"
+                    },
+                    "standard_output": "/tmp/slurm_test_%j.out",
+                    "standard_error": "/tmp/slurm_test_%j.err"
                 }
             }
             
