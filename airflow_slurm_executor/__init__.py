@@ -1,8 +1,28 @@
 """Airflow Slurm Executor - Execute Airflow tasks on Slurm clusters via REST API."""
 
-__version__ = "0.1.0"
-__author__ = "Jon TK"
-
+from airflow_slurm_executor.version import __version__, __author__
 from airflow_slurm_executor.slurm_executor import SlurmExecutor
+from airflow_slurm_executor.slurm_api_client import SlurmAPIClient
+from airflow_slurm_executor.slurm_token_manager import SlurmTokenManager
+from airflow_slurm_executor.exceptions import (
+    SlurmExecutorException,
+    SlurmTokenError,
+    SlurmAPIError,
+    SlurmConfigurationError,
+    SlurmJobSubmissionError,
+    SlurmJobNotFoundError,
+)
 
-__all__ = ["SlurmExecutor"]
+__all__ = [
+    "__version__",
+    "__author__",
+    "SlurmExecutor",
+    "SlurmAPIClient", 
+    "SlurmTokenManager",
+    "SlurmExecutorException",
+    "SlurmTokenError",
+    "SlurmAPIError",
+    "SlurmConfigurationError",
+    "SlurmJobSubmissionError",
+    "SlurmJobNotFoundError",
+]
