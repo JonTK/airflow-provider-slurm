@@ -1,0 +1,92 @@
+# Example Airflow Configuration for Slurm Executor
+# Copy this to your airflow.cfg and customize for your environment
+
+[core]
+# Set the Slurm executor
+executor = airflow_slurm_executor.slurm_executor.SlurmExecutor
+
+# Increase parallelism for Slurm workloads
+parallelism = 64
+max_active_runs_per_dag = 4
+
+# Logging configuration
+base_log_folder = /shared/airflow/logs
+remote_logging = False
+
+[logging]
+# Ensure logs are accessible to compute nodes
+base_log_folder = /shared/airflow/logs
+
+[slurm]
+# Slurm REST API Configuration
+# Replace with your actual Slurm REST API endpoint
+api_url = http://your-slurm-head-node:6820
+
+# Username for Slurm authentication
+username = airflow_user
+
+# JWT token lifespan in seconds
+token_lifespan = 3600
+
+# Default resource allocation
+default_partition = normal
+default_cpus = 1
+default_mem = 1G
+default_time_limit = 01:00:00
+
+# Optional: Account for job billing
+# default_account = your_slurm_account
+
+# Optional: Virtual environment path
+# Uncomment if you want tasks to run in a specific Python environment
+# airflow_venv = /shared/environments/airflow
+
+# Optional: Default container image
+# Uncomment if you want to use containers by default
+# default_container = docker://your-registry/airflow-worker:latest
+
+# API client configuration
+api_timeout = 30
+api_max_retries = 3
+
+# Executor behavior
+sync_interval = 10.0
+shutdown_mode = cancel
+shutdown_wait_timeout = 300
+
+[scheduler]
+# Increase frequency for Slurm job monitoring
+job_heartbeat_sec = 5
+scheduler_heartbeat_sec = 5
+
+# Process more files at once
+dag_dir_list_interval = 300
+catchup_by_default = False
+
+[webserver]
+# Web UI configuration
+web_server_port = 8080
+expose_config = True
+
+# Security settings (customize as needed)
+secret_key = your-secret-key-here
+
+[smtp]
+# Email configuration for alerts (optional)
+# smtp_host = your-smtp-server.com
+# smtp_starttls = True
+# smtp_ssl = False
+# smtp_user = your-email@company.com
+# smtp_password = your-email-password
+# smtp_port = 587
+# smtp_mail_from = airflow@your-company.com
+
+[celery]
+# Not used with Slurm executor, but kept for compatibility
+worker_concurrency = 16
+
+[kubernetes]
+# Not used with Slurm executor
+
+[local]
+# Not used with Slurm executor
