@@ -4,11 +4,12 @@ import hashlib
 import json
 import logging
 import os
+import re
 import shlex
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from airflow.configuration import conf
 from airflow.executors.base_executor import BaseExecutor
@@ -127,6 +128,35 @@ class SlurmExecutor(BaseExecutor):
         
         logger.debug(f"Loaded configuration: api_url={self.api_url}, partition={self.default_partition}")
 
+    def _convert_time_to_seconds(self, time_value: Union[str, int]) -> int:
+        """Convert time string or integer to seconds.
+        
+        Args:
+            time_value: Time as string (HH:MM:SS, MM:SS) or integer (seconds)
+            
+        Returns:
+            Time in seconds as integer
+        """
+        if isinstance(time_value, int):
+            return time_value
+            
+        if isinstance(time_value, str):
+            # Handle formats like "01:00:00", "60:00", "3600"
+            if ':' in time_value:
+                parts = time_value.split(':')
+                if len(parts) == 3:  # HH:MM:SS
+                    hours, minutes, seconds = map(int, parts)
+                    return hours * 3600 + minutes * 60 + seconds
+                elif len(parts) == 2:  # MM:SS
+                    minutes, seconds = map(int, parts)
+                    return minutes * 60 + seconds
+            else:
+                # Assume it's already in seconds as string
+                return int(time_value)
+        
+        # Fallback
+        return 3600  # 1 hour default
+
     def _validate_shared_filesystem(self) -> None:
         """Verify log directory is accessible and writable."""
         log_folder = conf.get("logging", "base_log_folder")
@@ -219,7 +249,7 @@ class SlurmExecutor(BaseExecutor):
             "tasks": 1,  # Single task per job
             "cpus_per_task": config.get("cpus_per_task", self.default_cpus),
             "memory_per_node": config.get("mem", self.default_mem),
-            "time_limit": config.get("time_limit", self.default_time_limit),
+            "time_limit": self._convert_time_to_seconds(config.get("time_limit", self.default_time_limit)),
             "current_working_directory": config.get("working_dir", self.airflow_home),
             "environment": self._build_environment(key),
             "standard_output": log_path,
