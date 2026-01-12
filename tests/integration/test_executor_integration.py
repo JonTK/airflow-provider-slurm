@@ -42,7 +42,6 @@ class TestSlurmExecutorIntegration:
             ), patch(
                 "os.remove"
             ):
-
                 # Setup mock client
                 mock_client = MagicMock()
                 mock_client.ping.return_value = True
@@ -91,7 +90,6 @@ class TestSlurmExecutorIntegration:
             ), patch(
                 "airflow_slurm_executor.slurm_executor.SlurmAPIClient"
             ) as mock_client_class:
-
                 # Setup mock client that fails ping
                 mock_client = MagicMock()
                 mock_client.ping.return_value = False
@@ -125,7 +123,6 @@ class TestSlurmExecutorIntegration:
             ), patch(
                 "os.remove"
             ):
-
                 mock_client = MagicMock()
                 mock_client.ping.return_value = True
                 mock_client.submit_job.return_value = {"job_id": 12345}
