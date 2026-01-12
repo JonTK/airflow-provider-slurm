@@ -10,7 +10,6 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.decorators import task
 
-
 default_args = {
     "owner": "data-team",
     "depends_on_past": False,
@@ -41,17 +40,11 @@ with DAG(
     def extract_data():
         """Extract data from various sources."""
         import time
-        import pandas as pd
 
         print("Extracting data from sources...")
 
         # Simulate data extraction
         data_size = 1000000
-        data = {
-            "feature_1": range(data_size),
-            "feature_2": [x * 2 for x in range(data_size)],
-            "target": [x % 2 for x in range(data_size)],
-        }
 
         print(f"Extracted {data_size} records")
         time.sleep(30)  # Simulate extraction time
@@ -114,8 +107,8 @@ with DAG(
     )
     def evaluate_model(model_path: str):
         """Evaluate model performance."""
-        import time
         import random
+        import time
 
         print(f"Evaluating model from {model_path}")
 
@@ -150,7 +143,8 @@ with DAG(
             return "deployed"
         else:
             print(
-                f"Model accuracy {model_metrics['accuracy']} below threshold {accuracy_threshold}"
+                f"Model accuracy {model_metrics['accuracy']} below threshold "
+                f"{accuracy_threshold}"
             )
             print("Model deployment skipped")
             return "skipped"

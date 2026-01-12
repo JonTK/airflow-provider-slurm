@@ -24,6 +24,7 @@ class SlurmAPIError(SlurmExecutorException):
         status_code: Optional[int] = None,
         response_text: Optional[str] = None,
     ):
+        """Initialize SlurmAPIError with status code and response details."""
         super().__init__(message)
         self.status_code = status_code
         self.response_text = response_text

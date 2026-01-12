@@ -1,19 +1,13 @@
 """Unit tests for SlurmExecutor."""
 
-import os
 import time
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from airflow.models.taskinstance import TaskInstanceKey
-from airflow.utils.state import TaskInstanceState
 
-from airflow_provider_slurm.exceptions import (
-    SlurmAPIError,
-    SlurmConfigurationError,
-    SlurmJobSubmissionError,
-)
+from airflow_provider_slurm.exceptions import SlurmAPIError, SlurmConfigurationError
 from airflow_provider_slurm.slurm_executor import SlurmExecutor
 
 

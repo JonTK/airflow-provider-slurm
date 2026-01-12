@@ -1,11 +1,12 @@
 """
-Basic Slurm Executor DAG Example
+Basic Slurm Executor DAG Example.
 
 This example demonstrates the simplest usage of the Slurm executor with basic tasks
 that run shell commands on the Slurm cluster.
 """
 
 from datetime import datetime, timedelta
+
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.dummy import DummyOperator
@@ -68,11 +69,11 @@ process_data = BashOperator(
     task_id="process_sample_data",
     bash_command="""
     echo "=== Processing Sample Data ==="
-    
+
     # Create sample dataset
     DATA_FILE="/tmp/sample_data_{{ ds_nodash }}.csv"
     echo "timestamp,value,category" > $DATA_FILE
-    
+
     # Generate 1000 sample records
     for i in $(seq 1 1000); do
         timestamp=$(date -d "$i minutes ago" '+%Y-%m-%d %H:%M:%S')
@@ -80,23 +81,23 @@ process_data = BashOperator(
         category=$((RANDOM % 5))
         echo "$timestamp,$value,cat_$category" >> $DATA_FILE
     done
-    
+
     echo "Generated $(wc -l < $DATA_FILE) lines of data"
     echo "Sample data:"
     head -5 $DATA_FILE
-    
+
     # Basic statistics
     echo "=== Basic Statistics ==="
     echo "Total records: $(tail -n +2 $DATA_FILE | wc -l)"
-    echo "Categories:" 
+    echo "Categories:"
     tail -n +2 $DATA_FILE | cut -d',' -f3 | sort | uniq -c
-    
+
     # Save summary
     SUMMARY_FILE="/tmp/data_summary_{{ ds_nodash }}.txt"
     echo "Data processing completed at $(date)" > $SUMMARY_FILE
     echo "Input file: $DATA_FILE" >> $SUMMARY_FILE
     echo "Records processed: $(tail -n +2 $DATA_FILE | wc -l)" >> $SUMMARY_FILE
-    
+
     echo "Summary saved to: $SUMMARY_FILE"
     """,
     executor_config={
@@ -116,15 +117,15 @@ cleanup = BashOperator(
     bash_command="""
     echo "=== Cleanup ==="
     echo "Removing temporary files for {{ ds }}"
-    
+
     # List files before cleanup
     echo "Files to clean:"
     ls -la /tmp/*{{ ds_nodash }}* 2>/dev/null || echo "No files to clean"
-    
+
     # Remove files
     rm -f /tmp/sample_data_{{ ds_nodash }}.csv
     rm -f /tmp/data_summary_{{ ds_nodash }}.txt
-    
+
     echo "Cleanup completed"
     """,
     dag=dag,

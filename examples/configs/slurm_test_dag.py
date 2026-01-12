@@ -1,15 +1,16 @@
 """
-Slurm Executor Test DAG
+Slurm Executor Test DAG.
 
 A simple test DAG to verify your Slurm executor configuration is working correctly.
 Run this first before using the more complex examples.
 """
 
 from datetime import datetime, timedelta
+
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-from airflow.operators.python import PythonOperator
 from airflow.operators.dummy import DummyOperator
+from airflow.operators.python import PythonOperator
 
 default_args = {
     "owner": "admin",
@@ -34,9 +35,9 @@ dag = DAG(
 
 def test_python_environment():
     """Test that Python environment is working correctly."""
-    import sys
     import os
     import platform
+    import sys
 
     print("=== Python Environment Test ===")
     print(f"Python version: {sys.version}")
@@ -103,26 +104,26 @@ test_filesystem = BashOperator(
     task_id="test_filesystem_access",
     bash_command="""
     echo "=== Filesystem Test ==="
-    
+
     # Test temp directory access
     TEMP_DIR="/tmp/slurm_test_$(date +%s)"
     mkdir -p "$TEMP_DIR"
     echo "Created temp directory: $TEMP_DIR"
-    
+
     # Test file operations
     TEST_FILE="$TEMP_DIR/test_file.txt"
     echo "Test data from Slurm executor $(date)" > "$TEST_FILE"
     echo "File created: $TEST_FILE"
     echo "File contents:"
     cat "$TEST_FILE"
-    
+
     # Test file permissions
     ls -la "$TEST_FILE"
-    
+
     # Cleanup
     rm -rf "$TEMP_DIR"
     echo "Cleanup completed"
-    
+
     echo "✓ Filesystem test completed successfully!"
     """,
     executor_config={
@@ -141,27 +142,27 @@ test_resources = BashOperator(
     task_id="test_resource_allocation",
     bash_command="""
     echo "=== Resource Allocation Test ==="
-    
+
     echo "Slurm job environment variables:"
     env | grep SLURM | sort
-    
+
     echo "CPU information:"
     echo "Allocated CPUs: ${SLURM_CPUS_PER_TASK:-unknown}"
     echo "Available cores: $(nproc 2>/dev/null || echo 'unknown')"
-    
+
     echo "Memory information:"
     echo "Allocated memory: ${SLURM_MEM_PER_NODE:-unknown}"
     if command -v free > /dev/null; then
         echo "System memory:"
         free -h
     fi
-    
+
     echo "Job information:"
     echo "Job ID: ${SLURM_JOB_ID:-unknown}"
     echo "Job name: ${SLURM_JOB_NAME:-unknown}"
     echo "Partition: ${SLURM_JOB_PARTITION:-unknown}"
     echo "Node list: ${SLURM_JOB_NODELIST:-unknown}"
-    
+
     echo "✓ Resource allocation test completed successfully!"
     """,
     executor_config={
@@ -180,15 +181,15 @@ test_network = BashOperator(
     task_id="test_network_connectivity",
     bash_command="""
     echo "=== Network Connectivity Test ==="
-    
+
     echo "Testing basic network connectivity..."
-    
+
     # Test DNS resolution
     if command -v nslookup > /dev/null; then
         echo "DNS test (google.com):"
         nslookup google.com || echo "DNS lookup failed"
     fi
-    
+
     # Test HTTP connectivity
     if command -v curl > /dev/null; then
         echo "HTTP connectivity test:"
@@ -199,7 +200,7 @@ test_network = BashOperator(
     else
         echo "No HTTP client available (curl/wget)"
     fi
-    
+
     echo "✓ Network connectivity test completed!"
     """,
     executor_config={

@@ -49,7 +49,7 @@ Initial alpha release of `airflow-provider-slurm`.
 #### Core Features
 - **SlurmExecutor**: Main executor class inheriting from Airflow's BaseExecutor
   - Job submission via `execute_async()` method
-  - Status synchronization with `sync()` method  
+  - Status synchronization with `sync()` method
   - Task adoption for scheduler restart recovery
   - Graceful and emergency shutdown support
 - **SlurmAPIClient**: REST API communication layer

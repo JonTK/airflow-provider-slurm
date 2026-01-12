@@ -147,7 +147,7 @@ class TestSlurmTokenManager:
             manager = SlurmTokenManager()
 
             # Generate token
-            token = manager.get_token()
+            _token = manager.get_token()  # noqa: F841
             assert manager.token is not None
             assert manager.token_expiry is not None
 
@@ -164,7 +164,7 @@ class TestSlurmTokenManager:
         with patch("subprocess.run", return_value=mock_result) as mock_run:
             with patch("getpass.getuser", return_value="current_user"):
                 manager = SlurmTokenManager(username=None)
-                token = manager.get_token()
+                _token = manager.get_token()  # noqa: F841
 
                 # Should not include username parameter
                 cmd_args = mock_run.call_args[0][0]

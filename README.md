@@ -67,7 +67,7 @@ with DAG(
     start_date=datetime(2024, 1, 1),
     schedule=None,
 ) as dag:
-    
+
     @task(executor_config={
         'partition': 'gpu',
         'cpus_per_task': 4,
@@ -78,7 +78,7 @@ with DAG(
         import torch
         # Your GPU workload here
         return "Task completed on Slurm!"
-    
+
     gpu_task()
 ```
 

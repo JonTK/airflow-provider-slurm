@@ -160,7 +160,7 @@ class SlurmAPIClient:
         version = data.get("info", {}).get("version", self.api_version)
         logger.info(f"Discovered Slurm API version: {version}")
 
-        return version
+        return version  # type: ignore[no-any-return]
 
     def submit_job(self, job_spec: Dict[str, Any]) -> Dict[str, Any]:
         """Submit a job to Slurm.
@@ -192,7 +192,7 @@ class SlurmAPIClient:
             raise SlurmAPIError(f"No job_id in submission response: {result}")
 
         logger.info(f"Successfully submitted job {job_id}")
-        return result
+        return result  # type: ignore[no-any-return]
 
     def get_jobs(
         self, job_ids: Optional[List[Union[int, str]]] = None
@@ -232,7 +232,7 @@ class SlurmAPIClient:
         jobs = result.get("jobs", [])
         logger.info(f"Retrieved {len(jobs)} jobs from Slurm")
 
-        return result
+        return result  # type: ignore[no-any-return]
 
     def get_job(self, job_id: Union[int, str]) -> Optional[Dict[str, Any]]:
         """Get details for a specific job.
@@ -255,7 +255,7 @@ class SlurmAPIClient:
             # Extract job info from response
             jobs = result.get("jobs", [])
             if jobs:
-                return jobs[0]
+                return jobs[0]  # type: ignore[no-any-return]
 
             return None
 
@@ -286,7 +286,7 @@ class SlurmAPIClient:
             result = response.json()
 
             logger.info(f"Successfully cancelled job {job_id}")
-            return result
+            return result  # type: ignore[no-any-return]
 
         except SlurmAPIError as e:
             # 404 is acceptable - job already finished

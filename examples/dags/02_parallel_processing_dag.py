@@ -1,15 +1,16 @@
 """
-Parallel Processing with Slurm Executor
+Parallel Processing with Slurm Executor.
 
 This example demonstrates parallel data processing using multiple Slurm jobs
 with different resource requirements and partitions.
 """
 
 from datetime import datetime, timedelta
+
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-from airflow.operators.python import PythonOperator
 from airflow.operators.dummy import DummyOperator
+from airflow.operators.python import PythonOperator
 
 default_args = {
     "owner": "data-engineering",
@@ -35,7 +36,7 @@ def generate_partitioned_data():
     """Generate partitioned data files for parallel processing."""
     import os
 
-    base_dir = f"/tmp/parallel_processing_{{{{ ds_nodash }}}}"
+    base_dir = "/tmp/parallel_processing_{{ ds_nodash }}"
     os.makedirs(base_dir, exist_ok=True)
 
     for partition in range(4):
@@ -76,17 +77,17 @@ for i in range(4):
             task_id=f"process_partition_{i}_cpu",
             bash_command=f"""
             echo "=== Processing Partition {i} (CPU Intensive) ==="
-            PARTITION_FILE="/tmp/parallel_processing_{{{{ ds_nodash }}}}/partition_{i}.csv"
-            OUTPUT_FILE="/tmp/parallel_processing_{{{{ ds_nodash }}}}/processed_{i}.csv"
-            
+            PARTITION_FILE="/tmp/parallel_processing_{{ ds_nodash }}/partition_{i}.csv"
+            OUTPUT_FILE="/tmp/parallel_processing_{{ ds_nodash }}/processed_{i}.csv"
+
             if [ ! -f "$PARTITION_FILE" ]; then
                 echo "Error: Partition file not found: $PARTITION_FILE"
                 exit 1
             fi
-            
+
             echo "Input file: $PARTITION_FILE"
             echo "Records in partition: $(wc -l < $PARTITION_FILE)"
-            
+
             # Simulate CPU-intensive processing
             echo "id,value,timestamp,computed_value" > $OUTPUT_FILE
             tail -n +2 $PARTITION_FILE | while IFS=',' read -r id value timestamp; do
@@ -98,7 +99,7 @@ for i in range(4):
                     echo "Processed $id records..."
                 fi
             done
-            
+
             echo "Completed processing partition {i}"
             echo "Output records: $(tail -n +2 $OUTPUT_FILE | wc -l)"
             """,
@@ -122,26 +123,26 @@ for i in range(4):
             task_id=f"process_partition_{i}_memory",
             bash_command=f"""
             echo "=== Processing Partition {i} (Memory Intensive) ==="
-            PARTITION_FILE="/tmp/parallel_processing_{{{{ ds_nodash }}}}/partition_{i}.csv"
-            OUTPUT_FILE="/tmp/parallel_processing_{{{{ ds_nodash }}}}/processed_{i}.csv"
-            
+            PARTITION_FILE="/tmp/parallel_processing_{{ ds_nodash }}/partition_{i}.csv"
+            OUTPUT_FILE="/tmp/parallel_processing_{{ ds_nodash }}/processed_{i}.csv"
+
             if [ ! -f "$PARTITION_FILE" ]; then
                 echo "Error: Partition file not found: $PARTITION_FILE"
                 exit 1
             fi
-            
+
             echo "Input file: $PARTITION_FILE"
-            
+
             # Simulate memory-intensive processing (sorting, aggregating)
             echo "id,value,timestamp,aggregated_value" > $OUTPUT_FILE
-            
+
             # Load all data into memory and process (simulated with sort)
-            tail -n +2 $PARTITION_FILE | sort -t',' -k2,2n | while IFS=',' read -r id value timestamp; do
+            tail -n +2 $PARTITION_FILE | sort -t',' -k2,2n | while IFS=',' read -r id value timestamp; do  # noqa: E501
                 # Simulate memory-intensive aggregation
                 aggregated_value=$((value + (id % 1000)))
                 echo "$id,$value,$timestamp,$aggregated_value" >> $OUTPUT_FILE
             done
-            
+
             echo "Completed memory-intensive processing for partition {i}"
             echo "Output records: $(tail -n +2 $OUTPUT_FILE | wc -l)"
             """,
@@ -169,15 +170,15 @@ aggregate_results = BashOperator(
     echo "=== Aggregating Results ==="
     BASE_DIR="/tmp/parallel_processing_{{ ds_nodash }}"
     FINAL_OUTPUT="$BASE_DIR/final_results.csv"
-    
+
     echo "id,value,timestamp,processed_value,partition" > $FINAL_OUTPUT
-    
+
     total_records=0
     for i in {0..3}; do
         PROCESSED_FILE="$BASE_DIR/processed_$i.csv"
         if [ -f "$PROCESSED_FILE" ]; then
             echo "Merging partition $i..."
-            tail -n +2 "$PROCESSED_FILE" | while IFS=',' read -r id value timestamp processed_value; do
+            tail -n +2 "$PROCESSED_FILE" | while IFS=',' read -r id value timestamp processed_value; do  # noqa: E501
                 echo "$id,$value,$timestamp,$processed_value,$i" >> $FINAL_OUTPUT
             done
             partition_records=$(tail -n +2 "$PROCESSED_FILE" | wc -l)
@@ -187,17 +188,17 @@ aggregate_results = BashOperator(
             echo "Warning: Processed file not found for partition $i"
         fi
     done
-    
+
     echo "=== Final Statistics ==="
     echo "Total records processed: $(tail -n +2 $FINAL_OUTPUT | wc -l)"
     echo "Output file: $FINAL_OUTPUT"
-    
+
     # Generate summary statistics
     echo "=== Summary by Partition ==="
-    tail -n +2 $FINAL_OUTPUT | cut -d',' -f5 | sort | uniq -c | while read count partition; do
+    tail -n +2 $FINAL_OUTPUT | cut -d',' -f5 | sort | uniq -c | while read count partition; do  # noqa: E501
         echo "Partition $partition: $count records"
     done
-    
+
     # Save processing summary
     SUMMARY_FILE="$BASE_DIR/processing_summary.txt"
     {
@@ -209,7 +210,7 @@ aggregate_results = BashOperator(
         echo "Partitions processed: 4"
         echo "Output file: $FINAL_OUTPUT"
     } > $SUMMARY_FILE
-    
+
     echo "Summary saved to: $SUMMARY_FILE"
     """,
     executor_config={
@@ -230,37 +231,37 @@ quality_check = BashOperator(
     echo "=== Data Quality Check ==="
     BASE_DIR="/tmp/parallel_processing_{{ ds_nodash }}"
     FINAL_OUTPUT="$BASE_DIR/final_results.csv"
-    
+
     if [ ! -f "$FINAL_OUTPUT" ]; then
         echo "Error: Final output file not found"
         exit 1
     fi
-    
+
     # Check record counts
     expected_records=4000  # 4 partitions * 1000 records each
     actual_records=$(tail -n +2 "$FINAL_OUTPUT" | wc -l)
-    
+
     echo "Expected records: $expected_records"
     echo "Actual records: $actual_records"
-    
+
     if [ "$actual_records" -eq "$expected_records" ]; then
         echo "✓ Record count check PASSED"
     else
         echo "✗ Record count check FAILED"
         exit 1
     fi
-    
+
     # Check for duplicates
-    duplicate_count=$(tail -n +2 "$FINAL_OUTPUT" | cut -d',' -f1 | sort | uniq -d | wc -l)
+    duplicate_count=$(tail -n +2 "$FINAL_OUTPUT" | cut -d',' -f1 | sort | uniq -d | wc -l)  # noqa: E501
     echo "Duplicate IDs found: $duplicate_count"
-    
+
     if [ "$duplicate_count" -eq 0 ]; then
         echo "✓ Duplicate check PASSED"
     else
         echo "✗ Duplicate check FAILED"
         exit 1
     fi
-    
+
     echo "✓ All quality checks PASSED"
     """,
     dag=dag,
@@ -272,12 +273,12 @@ cleanup = BashOperator(
     bash_command="""
     echo "=== Cleanup ==="
     BASE_DIR="/tmp/parallel_processing_{{ ds_nodash }}"
-    
+
     if [ -d "$BASE_DIR" ]; then
         echo "Cleaning up processing directory: $BASE_DIR"
         echo "Files to remove:"
         ls -la "$BASE_DIR/"
-        
+
         # Keep summary but remove data files
         find "$BASE_DIR" -name "*.csv" -delete
         echo "Data files removed, keeping summary files"

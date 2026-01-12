@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Test using the actual SlurmExecutor code."""
 
-import sys
 import os
+import sys
 import tempfile
 from unittest.mock import MagicMock, patch
 
@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, "/home/jontk/src/github.com/jontk/airflow-slurm-executor")
 
 from airflow.models.taskinstance import TaskInstanceKey
+
 from airflow_provider_slurm.slurm_executor import SlurmExecutor
 from airflow_provider_slurm.slurm_token_manager import SlurmTokenManager
 

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Comprehensive test jobs for validating the Slurm executor."""
 
+import json
 import sys
 import time
-import json
-from unittest.mock import MagicMock
 from datetime import datetime
+from unittest.mock import MagicMock
 
 # Add the package to Python path
 sys.path.insert(0, "/home/jontk/src/github.com/jontk/airflow-slurm-executor")

@@ -9,7 +9,6 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.decorators import task
 
-
 default_args = {
     "owner": "airflow",
     "depends_on_past": False,
@@ -32,8 +31,8 @@ with DAG(
     @task
     def hello_slurm():
         """Simple hello world task."""
-        import time
         import socket
+        import time
 
         print(f"Hello from Slurm! Running on node: {socket.gethostname()}")
         print("This task is executing on a Slurm compute node")
@@ -53,8 +52,8 @@ with DAG(
     )
     def cpu_intensive_task():
         """Task with custom resource requirements."""
-        import time
         import os
+        import time
 
         print(f"Running CPU intensive task with {os.cpu_count()} CPUs")
         print("Allocated 2 CPUs and 4GB memory via executor_config")

@@ -57,7 +57,8 @@ class SlurmExecutor(BaseExecutor):
 
         # State tracking
         self.last_sync_time: float = 0.0
-        self.running: Dict[TaskInstanceKey, Dict[str, Any]] = {}  # type: ignore[assignment]
+        # Override base class set with dict for job metadata
+        self.running: Dict[TaskInstanceKey, Dict[str, Any]] = {}  # type: ignore[assignment]  # noqa: E501
 
         logger.info("Initialized SlurmExecutor")
 
@@ -130,7 +131,8 @@ class SlurmExecutor(BaseExecutor):
         )
 
         logger.debug(
-            f"Loaded configuration: api_url={self.api_url}, partition={self.default_partition}"
+            f"Loaded configuration: api_url={self.api_url}, "
+            f"partition={self.default_partition}"
         )
 
     def _convert_time_to_seconds(self, time_value: Union[str, int]) -> int:
@@ -326,7 +328,7 @@ class SlurmExecutor(BaseExecutor):
         if self.airflow_venv and not self.default_container:
             lines.extend(
                 [
-                    f"# Activate virtual environment",
+                    "# Activate virtual environment",
                     f"source {self.airflow_venv}/bin/activate",
                     "",
                 ]
@@ -512,8 +514,8 @@ class SlurmExecutor(BaseExecutor):
         if missing_duration > timedelta(minutes=5):
             self.fail(key)
             logger.error(
-                f"Task {key} job {slurm_job_id} missing from Slurm for {missing_duration}, "
-                "marking as failed"
+                f"Task {key} job {slurm_job_id} missing from Slurm "
+                f"for {missing_duration}, marking as failed"
             )
             del self.running[key]
 
@@ -573,7 +575,7 @@ class SlurmExecutor(BaseExecutor):
             return
 
         # Best-effort cancellation, ignore errors
-        for key, job_info in self.running.items():
+        for _key, job_info in self.running.items():
             try:
                 self.slurm_client.cancel_job(job_info["slurm_job_id"])
             except Exception:
