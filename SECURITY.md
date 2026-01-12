@@ -167,7 +167,6 @@ We follow responsible disclosure practices:
 ## Additional Resources
 
 - [Apache Airflow Security](https://airflow.apache.org/docs/apache-airflow/stable/security/index.html)
-- [Slurm Security Guide](https://slurm.schedmd.com/security.html)
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
 - [CWE Top 25](https://cwe.mitre.org/top25/)
 

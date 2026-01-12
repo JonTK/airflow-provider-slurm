@@ -408,8 +408,8 @@ def process_data(**context):
 
 - **Slurm Documentation**: https://slurm.schedmd.com/documentation.html
 - **Airflow Documentation**: https://airflow.apache.org/docs/
-- **Executor Repository**: https://github.com/your-org/airflow-slurm-executor
-- **Issues and Support**: https://github.com/your-org/airflow-slurm-executor/issues
+- **Executor Repository**: https://github.com/JonTK/airflow-provider-slurm
+- **Issues and Support**: https://github.com/JonTK/airflow-provider-slurm/issues
 
 ## 🤝 Contributing
 
