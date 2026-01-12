@@ -39,8 +39,10 @@ class TestSlurmAPIClient:
             timeout=60,
             max_retries=5,
         )
-        
-        assert client.base_url == "https://slurm.example.com:6820"  # Trailing slash removed
+
+        assert (
+            client.base_url == "https://slurm.example.com:6820"
+        )  # Trailing slash removed
         assert client.api_version == "v0.0.40"
         assert client.timeout == 60
         assert client.max_retries == 5
@@ -54,7 +56,7 @@ class TestSlurmAPIClient:
             json={"info": {"version": "v0.0.42"}},
             status=200,
         )
-        
+
         version = api_client.get_api_version()
         assert version == "v0.0.42"
 
@@ -66,28 +68,31 @@ class TestSlurmAPIClient:
             "job": {
                 "name": "test_job",
                 "partition": "compute",
-            }
+            },
         }
-        
+
         responses.add(
             responses.POST,
             "https://slurm.example.com:6820/slurm/v0.0.42/job/submit",
             json={"job_id": 12345},
             status=200,
         )
-        
+
         result = api_client.submit_job(job_spec)
         assert result["job_id"] == 12345
-        
+
         # Verify request
         assert len(responses.calls) == 1
-        assert responses.calls[0].request.headers["X-SLURM-USER-TOKEN"] == "test_token_12345"
+        assert (
+            responses.calls[0].request.headers["X-SLURM-USER-TOKEN"]
+            == "test_token_12345"
+        )
 
     @responses.activate
     def test_submit_job_with_errors(self, api_client):
         """Test job submission with errors in response."""
         job_spec = {"script": "#!/bin/bash", "job": {}}
-        
+
         responses.add(
             responses.POST,
             "https://slurm.example.com:6820/slurm/v0.0.42/job/submit",
@@ -99,10 +104,10 @@ class TestSlurmAPIClient:
             },
             status=200,
         )
-        
+
         with pytest.raises(SlurmAPIError) as exc_info:
             api_client.submit_job(job_spec)
-        
+
         assert "Invalid partition" in str(exc_info.value)
         assert "Insufficient resources" in str(exc_info.value)
 
@@ -110,17 +115,17 @@ class TestSlurmAPIClient:
     def test_submit_job_no_job_id(self, api_client):
         """Test job submission response without job_id."""
         job_spec = {"script": "#!/bin/bash", "job": {}}
-        
+
         responses.add(
             responses.POST,
             "https://slurm.example.com:6820/slurm/v0.0.42/job/submit",
             json={"status": "ok"},  # Missing job_id
             status=200,
         )
-        
+
         with pytest.raises(SlurmAPIError) as exc_info:
             api_client.submit_job(job_spec)
-        
+
         assert "No job_id in submission response" in str(exc_info.value)
 
     @responses.activate
@@ -137,7 +142,7 @@ class TestSlurmAPIClient:
             },
             status=200,
         )
-        
+
         result = api_client.get_jobs()
         assert len(result["jobs"]) == 2
         assert result["jobs"][0]["job_id"] == 123
@@ -155,10 +160,10 @@ class TestSlurmAPIClient:
             },
             status=200,
         )
-        
+
         result = api_client.get_jobs(job_ids=[123, 124])
         assert len(result["jobs"]) == 1
-        
+
         # Verify query parameter (URL encoded)
         assert "job_id=123%2C124" in responses.calls[0].request.url
 
@@ -169,13 +174,11 @@ class TestSlurmAPIClient:
             responses.GET,
             "https://slurm.example.com:6820/slurm/v0.0.42/job/12345",
             json={
-                "jobs": [
-                    {"job_id": 12345, "job_state": "COMPLETED", "exit_code": 0}
-                ]
+                "jobs": [{"job_id": 12345, "job_state": "COMPLETED", "exit_code": 0}]
             },
             status=200,
         )
-        
+
         job_info = api_client.get_job(12345)
         assert job_info is not None
         assert job_info["job_id"] == 12345
@@ -190,7 +193,7 @@ class TestSlurmAPIClient:
             json={"error": "Job not found"},
             status=404,
         )
-        
+
         job_info = api_client.get_job(99999)
         assert job_info is None
 
@@ -203,7 +206,7 @@ class TestSlurmAPIClient:
             json={"status": "Job cancelled"},
             status=200,
         )
-        
+
         result = api_client.cancel_job(12345)
         assert result is not None
         assert result["status"] == "Job cancelled"
@@ -217,7 +220,7 @@ class TestSlurmAPIClient:
             json={"error": "Job not found"},
             status=404,
         )
-        
+
         result = api_client.cancel_job(99999)
         assert result is None  # Should return None for 404
 
@@ -231,7 +234,7 @@ class TestSlurmAPIClient:
             json={"error": "Invalid token"},
             status=401,
         )
-        
+
         # Second request succeeds after token refresh
         responses.add(
             responses.GET,
@@ -239,10 +242,10 @@ class TestSlurmAPIClient:
             json={"jobs": []},
             status=200,
         )
-        
+
         result = api_client.get_jobs()
         assert result["jobs"] == []
-        
+
         # Verify token was invalidated and refreshed
         mock_token_manager.invalidate.assert_called_once()
         assert mock_token_manager.get_token.call_count >= 2
@@ -261,7 +264,7 @@ class TestSlurmAPIClient:
             "https://slurm.example.com:6820/slurm/v0.0.42/jobs",
             body=requests.RequestException("Connection error"),
         )
-        
+
         # Third attempt succeeds
         responses.add(
             responses.GET,
@@ -269,10 +272,10 @@ class TestSlurmAPIClient:
             json={"jobs": []},
             status=200,
         )
-        
+
         with patch("time.sleep"):  # Skip actual sleep in tests
             result = api_client.get_jobs()
-        
+
         assert result["jobs"] == []
         assert len(responses.calls) == 3
 
@@ -286,11 +289,11 @@ class TestSlurmAPIClient:
                 "https://slurm.example.com:6820/slurm/v0.0.42/jobs",
                 body=requests.RequestException("Connection error"),
             )
-        
+
         with patch("time.sleep"):  # Skip actual sleep in tests
             with pytest.raises(SlurmAPIError) as exc_info:
                 api_client.get_jobs()
-        
+
         assert "after 3 attempts" in str(exc_info.value)
 
     @responses.activate
@@ -302,7 +305,7 @@ class TestSlurmAPIClient:
             json={"info": {"version": "v0.0.42"}},
             status=200,
         )
-        
+
         assert api_client.ping() is True
 
     @responses.activate
@@ -313,7 +316,7 @@ class TestSlurmAPIClient:
             "https://slurm.example.com:6820/openapi/v3",
             status=500,
         )
-        
+
         assert api_client.ping() is False
 
     def test_auth_headers(self, api_client, mock_token_manager):
@@ -331,10 +334,10 @@ class TestSlurmAPIClient:
             json={"error": "Bad request", "details": "Invalid script"},
             status=400,
         )
-        
+
         with pytest.raises(SlurmAPIError) as exc_info:
             api_client.submit_job({"script": "", "job": {}})
-        
+
         error = exc_info.value
         assert error.status_code == 400
         assert "Bad request" in error.response_text
