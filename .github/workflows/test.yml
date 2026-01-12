@@ -53,7 +53,10 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install apache-airflow==${{ matrix.airflow-version }}
+        PYTHON_VERSION="${{ matrix.python-version }}"
+        AIRFLOW_VERSION="${{ matrix.airflow-version }}"
+        CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
+        pip install "apache-airflow==${AIRFLOW_VERSION}" --constraint "${CONSTRAINT_URL}"
         pip install -e ".[dev]"
         pip install -r requirements-dev.txt
 
@@ -133,7 +136,8 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install apache-airflow==2.8.0
+        CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-2.8.0/constraints-3.10.txt"
+        pip install "apache-airflow==2.8.0" --constraint "${CONSTRAINT_URL}"
         pip install -e ".[dev]"
         pip install -r requirements-dev.txt
 
