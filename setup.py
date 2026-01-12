@@ -1,14 +1,8 @@
 """Setup configuration for airflow-provider-slurm."""
 
-import os
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
-# Read version from version.py
-version_file = os.path.join(
-    os.path.dirname(__file__), "airflow_slurm_executor", "version.py"
-)
-with open(version_file) as f:
-    exec(f.read())
+from airflow_slurm_executor.version import __version__  # type: ignore[import]
 
 # Read long description from README
 with open("README.md", "r", encoding="utf-8") as fh:

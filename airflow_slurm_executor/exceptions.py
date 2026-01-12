@@ -1,5 +1,7 @@
 """Custom exceptions for the Slurm executor."""
 
+from typing import Optional
+
 
 class SlurmExecutorException(Exception):
     """Base exception for all Slurm executor errors."""
@@ -17,7 +19,10 @@ class SlurmAPIError(SlurmExecutorException):
     """Raised when Slurm REST API requests fail."""
 
     def __init__(
-        self, message: str, status_code: int = None, response_text: str = None
+        self,
+        message: str,
+        status_code: Optional[int] = None,
+        response_text: Optional[str] = None,
     ):
         super().__init__(message)
         self.status_code = status_code

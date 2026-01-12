@@ -1,20 +1,17 @@
 """Slurm executor for Apache Airflow."""
 
 import hashlib
-import json
 import logging
 import os
-import re
 import shlex
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 from airflow.configuration import conf
 from airflow.executors.base_executor import BaseExecutor
 from airflow.models.taskinstance import TaskInstance, TaskInstanceKey
-from airflow.utils.state import TaskInstanceState
 
 from airflow_slurm_executor.exceptions import (
     SlurmAPIError,
@@ -60,7 +57,7 @@ class SlurmExecutor(BaseExecutor):
 
         # State tracking
         self.last_sync_time: float = 0.0
-        self.running: Dict[TaskInstanceKey, Dict[str, Any]] = {}
+        self.running: Dict[TaskInstanceKey, Dict[str, Any]] = {}  # type: ignore[assignment]
 
         logger.info("Initialized SlurmExecutor")
 
@@ -205,6 +202,7 @@ class SlurmExecutor(BaseExecutor):
             job_spec = self._build_job_spec(key, command, queue, executor_config)
 
             # Submit to Slurm
+            assert self.slurm_client is not None, "Executor not started"
             result = self.slurm_client.submit_job(job_spec)
             job_id = result.get("job_id")
 
@@ -423,6 +421,7 @@ class SlurmExecutor(BaseExecutor):
             job_ids = [info["slurm_job_id"] for info in self.running.values()]
 
             # Query Slurm for job statuses
+            assert self.slurm_client is not None, "Executor not started"
             result = self.slurm_client.get_jobs(job_ids=job_ids)
             jobs = result.get("jobs", [])
 
@@ -491,6 +490,7 @@ class SlurmExecutor(BaseExecutor):
 
         # Try to get job from history
         try:
+            assert self.slurm_client is not None, "Executor not started"
             job_history = self.slurm_client.get_job_history(slurm_job_id)
 
             if job_history:
@@ -537,6 +537,7 @@ class SlurmExecutor(BaseExecutor):
 
     def _cancel_all_jobs(self) -> None:
         """Cancel all tracked Slurm jobs."""
+        assert self.slurm_client is not None, "Executor not started"
         for key, job_info in list(self.running.items()):
             slurm_job_id = job_info["slurm_job_id"]
             try:
@@ -568,6 +569,9 @@ class SlurmExecutor(BaseExecutor):
         """Emergency shutdown - kill everything immediately."""
         logger.warning("SlurmExecutor emergency terminate: killing all jobs")
 
+        if self.slurm_client is None:
+            return
+
         # Best-effort cancellation, ignore errors
         for key, job_info in self.running.items():
             try:
@@ -577,7 +581,9 @@ class SlurmExecutor(BaseExecutor):
 
         self.running.clear()
 
-    def try_adopt_task_instances(self, tis: List[TaskInstance]) -> List[TaskInstance]:
+    def try_adopt_task_instances(
+        self, tis: Sequence[TaskInstance]
+    ) -> List[TaskInstance]:
         """Adopt running tasks after scheduler restart.
 
         Args:
@@ -595,6 +601,7 @@ class SlurmExecutor(BaseExecutor):
 
         try:
             # Query Slurm for all jobs
+            assert self.slurm_client is not None, "Executor not started"
             response = self.slurm_client.get_jobs()
             jobs = response.get("jobs", [])
 
