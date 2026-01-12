@@ -22,7 +22,7 @@ setup(
     description="Slurm executor for Apache Airflow using REST API",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/jontk/airflow-slurm-executor",
+    url="https://github.com/JonTK/airflow-provider-slurm",
     packages=find_packages(exclude=["tests*"]),
     classifiers=[
         "Development Status :: 3 - Alpha",

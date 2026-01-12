@@ -1,90 +1,119 @@
-# Contributing to Airflow Slurm Executor
+# Contributing to Airflow Provider Slurm
 
-Thank you for your interest in contributing to the Airflow Slurm Executor! This document provides guidelines and instructions for contributing.
-
-## Code of Conduct
-
-By participating in this project, you agree to abide by our code of conduct: be respectful, inclusive, and constructive in all interactions.
+Thank you for your interest in contributing to the Airflow Provider Slurm project! This document provides guidelines and instructions for contributing.
 
 ## Getting Started
 
-1. Fork the repository on GitHub
-2. Clone your fork locally:
+### Prerequisites
+
+- Python 3.8+
+- Git
+- Access to a Slurm cluster (for integration testing)
+
+### Development Setup
+
+```bash
+# Fork and clone the repository
+git clone https://github.com/JonTK/airflow-provider-slurm
+cd airflow-provider-slurm
+
+# Create a virtual environment
+python -m venv venv
+source venv/bin/activate
+
+# Install in development mode with dev dependencies
+pip install -e ".[dev]"
+
+# Install pre-commit hooks
+pre-commit install
+```
+
+## How to Contribute
+
+### Reporting Bugs
+
+1. Check existing [issues](https://github.com/JonTK/airflow-provider-slurm/issues) to avoid duplicates
+2. Use the bug report template when creating a new issue
+3. Include:
+   - Python version
+   - Airflow version
+   - Slurm version
+   - Steps to reproduce
+   - Expected vs actual behavior
+   - Relevant logs or error messages
+
+### Suggesting Features
+
+1. Check existing issues and discussions for similar suggestions
+2. Open a new issue using the feature request template
+3. Describe the use case and proposed solution
+4. Be open to discussion and alternative approaches
+
+### Submitting Code
+
+1. **Fork** the repository
+2. **Create a branch** for your changes:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/airflow-slurm-executor.git
-   cd airflow-slurm-executor
+   git checkout -b feature/your-feature-name
    ```
-3. Create a virtual environment:
+3. **Make your changes** following our coding standards
+4. **Write tests** for new functionality
+5. **Run the test suite**:
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pytest
    ```
-4. Install the package in development mode:
+6. **Commit your changes** using conventional commits:
    ```bash
-   make install-dev
+   git commit -m "feat: add new feature description"
    ```
+7. **Push** to your fork and **submit a pull request**
 
-## Development Workflow
+## Coding Standards
 
-### 1. Create a Branch
+### Code Style
 
-Create a feature branch from `main`:
+- Follow [PEP 8](https://pep8.org/) guidelines
+- Use [Black](https://black.readthedocs.io/) for code formatting
+- Use [isort](https://pycqa.github.io/isort/) for import sorting
+- Maximum line length: 88 characters
+
+Run formatters before committing:
 ```bash
-git checkout -b feature/your-feature-name
+black .
+isort .
 ```
 
-### 2. Make Your Changes
+### Type Hints
 
-- Write clean, documented code
-- Follow the existing code style
-- Add or update tests as needed
-- Update documentation if required
+- Use type hints for all function signatures
+- Run mypy for type checking:
+  ```bash
+  mypy airflow_slurm_executor
+  ```
 
-### 3. Code Quality
+### Documentation
 
-Before committing, ensure your code meets quality standards:
+- Add docstrings to all public functions and classes
+- Update README.md for user-facing changes
+- Update CHANGELOG.md for all notable changes
 
-```bash
-# Format code
-make format
+### Commit Messages
 
-# Run linting
-make lint
+Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
-# Run type checking
-make type-check
+- `feat:` - New features
+- `fix:` - Bug fixes
+- `docs:` - Documentation changes
+- `test:` - Test additions or modifications
+- `refactor:` - Code refactoring
+- `chore:` - Maintenance tasks
 
-# Run tests
-make test-cov
+Examples:
 ```
-
-### 4. Commit Your Changes
-
-We use conventional commits for clear history:
-
-- `feat:` New feature
-- `fix:` Bug fix
-- `docs:` Documentation changes
-- `style:` Code style changes (formatting, etc.)
-- `refactor:` Code refactoring
-- `test:` Test additions or changes
-- `chore:` Maintenance tasks
-
-Example:
-```bash
-git commit -m "feat: add support for GPU resource allocation"
+feat: add support for GPU resource allocation
+fix: handle timeout errors in job submission
+docs: update installation instructions
 ```
-
-### 5. Push and Create Pull Request
-
-```bash
-git push origin feature/your-feature-name
-```
-
-Then create a pull request on GitHub with:
-- Clear title and description
-- Reference to any related issues
-- Summary of changes made
 
 ## Testing
 
@@ -92,60 +121,52 @@ Then create a pull request on GitHub with:
 
 ```bash
 # Run all tests
-make test
+pytest
 
 # Run with coverage
-make test-cov
+pytest --cov=airflow_slurm_executor
 
 # Run specific test file
-pytest tests/unit/test_token_manager.py
+pytest tests/test_executor.py
 
-# Run tests across Python versions
-tox
+# Run with verbose output
+pytest -v
 ```
 
 ### Writing Tests
 
-- Place unit tests in `tests/unit/`
-- Place integration tests in `tests/integration/`
-- Use pytest fixtures for common setup
-- Mock external dependencies (Slurm API, etc.)
-- Aim for >85% code coverage
+- Place tests in the `tests/` directory
+- Name test files `test_*.py`
+- Name test functions `test_*`
+- Use pytest fixtures for setup/teardown
+- Mock external dependencies (Slurm API, filesystem)
 
-Example test:
-```python
-def test_token_generation(mock_subprocess):
-    """Test that token manager generates tokens correctly."""
-    mock_subprocess.run.return_value.stdout = "SLURM_JWT=test_token"
-    
-    manager = SlurmTokenManager()
-    token = manager.get_token()
-    
-    assert token == "test_token"
-    mock_subprocess.run.assert_called_once()
-```
+## Pull Request Process
 
-## Documentation
+1. Ensure all tests pass
+2. Update documentation as needed
+3. Add entry to CHANGELOG.md under `[Unreleased]`
+4. Request review from maintainers
+5. Address review feedback
 
-- Add docstrings to all public functions and classes
-- Use Google-style docstrings
-- Update README.md for user-facing changes
-- Update configuration docs for new options
+### PR Checklist
 
-## Release Process
+- [ ] Tests added/updated
+- [ ] Documentation updated
+- [ ] CHANGELOG.md updated
+- [ ] Code formatted with Black/isort
+- [ ] Type hints added
+- [ ] All CI checks pass
 
-1. Update version in `airflow_slurm_executor/version.py`
-2. Update CHANGELOG.md
-3. Create release PR
-4. After merge, tag release: `git tag v0.1.0`
-5. Push tag: `git push origin v0.1.0`
-6. CI/CD will handle PyPI deployment
+## Code of Conduct
+
+Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Questions?
 
-Feel free to:
-- Open an issue for bugs or feature requests
-- Start a discussion for general questions
-- Reach out to maintainers
+- Open a [Discussion](https://github.com/JonTK/airflow-provider-slurm/discussions)
+- Check existing issues and documentation
 
-Thank you for contributing!
+## License
+
+By contributing, you agree that your contributions will be licensed under the Apache License 2.0.

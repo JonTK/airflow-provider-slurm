@@ -1,0 +1,221 @@
+name: Performance Issue
+description: Report performance problems or optimization opportunities
+title: "[PERF] "
+labels: ["performance", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Performance is critical for HPC workloads. Help us identify bottlenecks and optimization opportunities!
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Performance Issue Description
+      description: Describe the performance problem you're experiencing
+      placeholder: Tell us about the performance issue
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: Which component is experiencing the performance issue?
+      options:
+        - Job Submission
+        - Job Monitoring/Polling
+        - Log Retrieval
+        - Task State Updates
+        - Job Recovery
+        - API Communication
+        - Database Queries
+        - File I/O
+        - Overall Executor Performance
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Performance Impact
+      description: How severe is the performance issue?
+      options:
+        - Critical - System is unusable
+        - High - Significant degradation
+        - Medium - Noticeable but manageable
+        - Low - Minor inefficiency
+    validations:
+      required: true
+
+  - type: textarea
+    id: metrics
+    attributes:
+      label: Performance Metrics
+      description: Provide specific performance measurements
+      placeholder: |
+        - Task submission time: X seconds
+        - Number of concurrent tasks: Y
+        - Job polling frequency: Z seconds
+        - Memory usage: A GB
+        - CPU usage: B%
+        - API response time: C ms
+        - Throughput: D tasks/minute
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Performance
+      description: What performance did you expect?
+      placeholder: |
+        - Expected submission time: X seconds
+        - Expected throughput: Y tasks/minute
+        - Or describe what acceptable performance would look like
+    validations:
+      required: true
+
+  - type: textarea
+    id: workload
+    attributes:
+      label: Workload Characteristics
+      description: Describe your workload that exhibits this performance issue
+      placeholder: |
+        - Number of concurrent DAGs: X
+        - Number of tasks per DAG: Y
+        - Task duration: Z seconds/minutes/hours
+        - Task submission rate: A tasks/second
+        - Resource requirements per task: B CPUs, C GB memory
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Details
+      description: Describe your environment and scale
+      placeholder: |
+        - Slurm cluster size: X nodes
+        - Network latency to Slurm: Y ms
+        - Shared filesystem type: NFS/Lustre/GPFS/etc
+        - Airflow scheduler instances: Z
+        - Database backend: PostgreSQL/MySQL/etc
+    validations:
+      required: true
+
+  - type: textarea
+    id: profiling
+    attributes:
+      label: Profiling Data
+      description: If you've done any profiling, share the results
+      placeholder: |
+        Paste profiling output, traces, or metrics here
+        - Python profiler output
+        - Database query times
+        - Network traces
+        - System resource graphs
+      render: shell
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction Steps
+      description: How can we reproduce this performance issue?
+      placeholder: |
+        1. Configure executor with...
+        2. Run DAG with...
+        3. Monitor with...
+        4. Observe slow performance at...
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant Configuration
+      description: Share relevant configuration that might affect performance
+      placeholder: |
+        ```ini
+        [slurm]
+        poll_interval = 10
+        max_concurrent_jobs = 100
+        batch_size = 50
+        # ... other performance-related config
+        ```
+      render: ini
+
+  - type: textarea
+    id: analysis
+    attributes:
+      label: Root Cause Analysis
+      description: If you've identified the root cause or bottleneck, share your analysis
+      placeholder: |
+        - Profiling shows that X function takes Y% of time
+        - Database queries are slow because...
+        - API calls are rate-limited by...
+        - File I/O is bottlenecked by...
+
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: Workarounds/Mitigations
+      description: Have you found any workarounds or ways to mitigate the issue?
+      placeholder: |
+        - Increasing poll_interval helps but...
+        - Reducing concurrent tasks improves...
+        - Using a different configuration for...
+
+  - type: textarea
+    id: suggestions
+    attributes:
+      label: Optimization Suggestions
+      description: If you have ideas for optimization, share them
+      placeholder: |
+        - Could cache X to avoid repeated lookups
+        - Could batch Y operations together
+        - Could use asynchronous Z instead of synchronous
+        - Similar projects handle this by...
+
+  - type: input
+    id: provider-version
+    attributes:
+      label: Provider Version
+      description: What version of airflow-provider-slurm?
+      placeholder: "e.g., 0.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: airflow-version
+    attributes:
+      label: Airflow Version
+      description: What version of Apache Airflow?
+      placeholder: "e.g., 2.8.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any other context about the performance issue
+      placeholder: |
+        - Graphs or charts showing performance trends
+        - Comparison with other executors
+        - Business impact of the performance issue
+        - Any other relevant information
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please confirm the following
+      options:
+        - label: I have searched existing issues for similar performance problems
+          required: true
+        - label: I have provided specific performance metrics
+          required: true
+        - label: I have described the workload and environment
+          required: true

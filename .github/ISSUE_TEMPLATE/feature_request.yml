@@ -1,0 +1,146 @@
+name: Feature Request
+description: Suggest a new feature or enhancement
+title: "[FEATURE] "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please provide detailed information to help us understand and evaluate your request.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: Is your feature request related to a problem? Describe what the problem is.
+      placeholder: "I'm always frustrated when..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like to see
+      placeholder: A clear and concise description of what you want to happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Describe alternative solutions or features you've considered
+      placeholder: What other approaches could solve this problem?
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Feature Category
+      description: What area does this feature relate to?
+      options:
+        - Job Submission
+        - Job Monitoring
+        - Resource Management
+        - Configuration
+        - Logging
+        - Performance
+        - Security
+        - Documentation
+        - Testing
+        - API/Integration
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - Critical - Blocking my use case
+        - High - Important for production use
+        - Medium - Would be nice to have
+        - Low - Minor improvement
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: Describe your specific use case and how this feature would help
+      placeholder: |
+        I'm working on [project/workflow type] and need to...
+        This would help by...
+    validations:
+      required: true
+
+  - type: textarea
+    id: example
+    attributes:
+      label: Example Usage
+      description: If applicable, show how you'd like to use this feature
+      placeholder: |
+        ```python
+        # Example of how the feature would be used
+        @task(executor_config={
+            'new_feature': 'value'
+        })
+        def my_task():
+            pass
+        ```
+      render: python
+
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Implementation Suggestions
+      description: If you have ideas about how to implement this, share them here
+      placeholder: |
+        - Could leverage Slurm's X feature
+        - Might need to modify Y component
+        - Similar to how Z works in...
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact & Benefits
+      description: Who would benefit from this feature and how?
+      placeholder: |
+        - Users running ML workloads would benefit by...
+        - This would enable workflows that...
+        - Expected performance improvement of...
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Would you be willing to help with this feature?
+      options:
+        - label: I would be willing to submit a PR for this feature
+        - label: I can help test this feature
+        - label: I can provide more detailed requirements
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Add any other context, screenshots, or references about the feature request
+      placeholder: |
+        - Links to relevant documentation
+        - Screenshots or mockups
+        - References to similar features in other tools
+        - Any other relevant information
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please confirm the following
+      options:
+        - label: I have searched existing issues and feature requests to avoid duplicates
+          required: true
+        - label: This feature aligns with the project's goals (HPC/Slurm integration for Airflow)
+          required: true

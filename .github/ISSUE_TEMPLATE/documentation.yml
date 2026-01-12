@@ -1,0 +1,130 @@
+name: Documentation Improvement
+description: Report documentation issues or suggest improvements
+title: "[DOCS] "
+labels: ["documentation", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve our documentation! Clear documentation is crucial for adoption and usability.
+
+  - type: dropdown
+    id: doc-type
+    attributes:
+      label: Documentation Type
+      description: What type of documentation needs improvement?
+      options:
+        - README
+        - Installation Guide
+        - Configuration Guide
+        - API Documentation
+        - Examples/Tutorials
+        - Troubleshooting Guide
+        - Contributing Guide
+        - Security Policy
+        - Code Comments
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Issue Type
+      description: What kind of documentation issue is this?
+      options:
+        - Missing Information
+        - Incorrect/Outdated Information
+        - Unclear Explanation
+        - Missing Examples
+        - Broken Links
+        - Typo/Grammar
+        - Formatting Issue
+        - New Documentation Needed
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: Documentation Location
+      description: Where is the documentation that needs improvement?
+      placeholder: "e.g., docs/configuration.md, README.md line 45, docstring in slurm_executor.py"
+    validations:
+      required: true
+
+  - type: textarea
+    id: current
+    attributes:
+      label: Current Documentation
+      description: What does the current documentation say? (copy and paste if possible)
+      placeholder: Paste or describe the current documentation here
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Description
+      description: What is unclear, missing, or incorrect?
+      placeholder: Explain what's wrong or missing
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggested
+    attributes:
+      label: Suggested Improvement
+      description: How should the documentation be improved?
+      placeholder: |
+        Provide your suggested text, examples, or describe what should be added/changed
+    validations:
+      required: true
+
+  - type: textarea
+    id: audience
+    attributes:
+      label: Target Audience
+      description: Who would benefit from this documentation improvement?
+      placeholder: |
+        - New users trying to install
+        - Advanced users configuring resources
+        - Developers contributing code
+        - System administrators deploying
+      options:
+        - New Users
+        - Advanced Users
+        - Developers/Contributors
+        - System Administrators
+        - Everyone
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any other context, links, or references that would help
+      placeholder: |
+        - Links to related documentation
+        - Examples from other projects
+        - Screenshots if relevant
+        - Related issues or PRs
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Would you like to help with this documentation?
+      options:
+        - label: I would be willing to submit a PR to fix this documentation
+        - label: I can provide more examples or clarifications
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please confirm the following
+      options:
+        - label: I have checked that this isn't already documented elsewhere
+          required: true
+        - label: I have reviewed the existing documentation structure
+          required: true

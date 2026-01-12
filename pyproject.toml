@@ -27,10 +27,10 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/jontk/airflow-slurm-executor"
-Documentation = "https://github.com/jontk/airflow-slurm-executor#readme"
-Repository = "https://github.com/jontk/airflow-slurm-executor.git"
-Issues = "https://github.com/jontk/airflow-slurm-executor/issues"
+Homepage = "https://github.com/JonTK/airflow-provider-slurm"
+Documentation = "https://github.com/JonTK/airflow-provider-slurm#readme"
+Repository = "https://github.com/JonTK/airflow-provider-slurm.git"
+Issues = "https://github.com/JonTK/airflow-provider-slurm/issues"
 
 [tool.setuptools.dynamic]
 version = {attr = "airflow_slurm_executor.version.__version__"}

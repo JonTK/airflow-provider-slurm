@@ -1,0 +1,181 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+title: "[BUG] "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please provide as much detail as possible to help us investigate and fix the issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is
+      placeholder: Tell us what went wrong
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: Describe the expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: Describe what actually happened
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Provide detailed steps to reproduce the issue
+      placeholder: |
+        1. Configure Airflow with...
+        2. Create a DAG with...
+        3. Run the task...
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: dag
+    attributes:
+      label: Minimal DAG Example
+      description: If applicable, provide a minimal DAG that reproduces the issue
+      placeholder: |
+        ```python
+        from airflow import DAG
+        # Your minimal reproducible DAG here
+        ```
+      render: python
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: Include relevant error messages and logs
+      placeholder: |
+        Paste logs here (please redact any sensitive information)
+      render: shell
+
+  - type: input
+    id: provider-version
+    attributes:
+      label: Provider Version
+      description: What version of airflow-provider-slurm are you using?
+      placeholder: "e.g., 0.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: airflow-version
+    attributes:
+      label: Airflow Version
+      description: What version of Apache Airflow are you using?
+      placeholder: "e.g., 2.8.0"
+    validations:
+      required: true
+
+  - type: input
+    id: slurm-version
+    attributes:
+      label: Slurm Version
+      description: What version of Slurm are you using?
+      placeholder: "e.g., 23.02.5"
+    validations:
+      required: true
+
+  - type: input
+    id: slurmrestd-version
+    attributes:
+      label: Slurmrestd API Version
+      description: What version of the Slurm REST API (slurmrestd) are you using?
+      placeholder: "e.g., v0.0.40"
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python Version
+      description: What version of Python are you using?
+      placeholder: "e.g., 3.10.12"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment Type
+      description: How is Airflow deployed?
+      options:
+        - Standalone
+        - Docker/Docker Compose
+        - Kubernetes
+        - Virtual Machine
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: execution-mode
+    attributes:
+      label: Execution Mode
+      description: How are tasks executed on Slurm?
+      options:
+        - Virtual Environment
+        - Container (Singularity/Apptainer)
+        - Container (Docker)
+        - Direct Execution
+        - Other
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: Relevant Airflow and Slurm configuration (please redact sensitive values)
+      placeholder: |
+        ```ini
+        [core]
+        executor = airflow_slurm_executor.SlurmExecutor
+
+        [slurm]
+        api_url = https://cluster.example.com:6820
+        # ... other config
+        ```
+      render: ini
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here
+      placeholder: |
+        - Is this a regression? Did it work in a previous version?
+        - Does the issue occur consistently or intermittently?
+        - Are there any workarounds?
+        - Anything else that might be relevant
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please confirm the following
+      options:
+        - label: I have searched existing issues to ensure this is not a duplicate
+          required: true
+        - label: I have provided all required information above
+          required: true
+        - label: I have redacted any sensitive information from logs and configuration
+          required: true

@@ -90,8 +90,8 @@ See [Configuration Guide](docs/configuration.md) for detailed options.
 
 ```bash
 # Clone the repository
-git clone https://github.com/jontk/airflow-slurm-executor
-cd airflow-slurm-executor
+git clone https://github.com/JonTK/airflow-provider-slurm
+cd airflow-provider-slurm
 
 # Install in development mode
 pip install -e ".[dev]"
