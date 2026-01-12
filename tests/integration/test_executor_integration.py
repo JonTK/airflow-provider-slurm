@@ -4,8 +4,9 @@ These tests are designed to run with a real or mocked Slurm cluster.
 Currently implemented as placeholder tests with mocking.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from airflow_slurm_executor import SlurmExecutor
 
