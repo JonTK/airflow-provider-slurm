@@ -11,6 +11,8 @@ black>=22.0.0
 isort>=5.10.0
 flake8>=5.0.0
 mypy>=0.990
+types-requests>=2.28.0
+types-setuptools>=57.0.0
 pre-commit>=2.20.0
 
 # Documentation

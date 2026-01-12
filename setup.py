@@ -1,14 +1,16 @@
 """Setup configuration for airflow-provider-slurm."""
 
 import os
-from setuptools import setup, find_packages
 
-# Read version from version.py
+from setuptools import find_packages, setup
+
+# Read version from version.py without importing
 version_file = os.path.join(
-    os.path.dirname(__file__), "airflow_slurm_executor", "version.py"
+    os.path.dirname(__file__), "airflow_provider_slurm", "version.py"
 )
+version_dict = {}  # type: ignore[var-annotated]
 with open(version_file) as f:
-    exec(f.read())
+    exec(f.read(), version_dict)
 
 # Read long description from README
 with open("README.md", "r", encoding="utf-8") as fh:
@@ -16,7 +18,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="airflow-provider-slurm",
-    version=__version__,
+    version=version_dict["__version__"],
     author="Jon TK",
     author_email="",  # Add your email if desired
     description="Slurm executor for Apache Airflow using REST API",
@@ -60,7 +62,7 @@ setup(
     },
     entry_points={
         "airflow.executors": [
-            "slurm = airflow_slurm_executor.slurm_executor:SlurmExecutor",
+            "slurm = airflow_provider_slurm.slurm_executor:SlurmExecutor",
         ],
     },
 )

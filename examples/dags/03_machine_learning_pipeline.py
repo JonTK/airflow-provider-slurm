@@ -1,86 +1,85 @@
 """
-Machine Learning Pipeline with Slurm Executor
+Machine Learning Pipeline with Slurm Executor.
 
 This example demonstrates a complete ML pipeline using different Slurm partitions
 for different computational requirements (CPU for preprocessing, GPU for training).
 """
 
 from datetime import datetime, timedelta
+
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-from airflow.operators.python import PythonOperator, BranchPythonOperator
 from airflow.operators.dummy import DummyOperator
+from airflow.operators.python import BranchPythonOperator
 from airflow.utils.trigger_rule import TriggerRule
 
 default_args = {
-    'owner': 'ml-team',
-    'depends_on_past': False,
-    'start_date': datetime(2024, 1, 1),
-    'email_on_failure': True,
-    'retries': 2,
-    'retry_delay': timedelta(minutes=5),
+    "owner": "ml-team",
+    "depends_on_past": False,
+    "start_date": datetime(2024, 1, 1),
+    "email_on_failure": True,
+    "retries": 2,
+    "retry_delay": timedelta(minutes=5),
 }
 
 dag = DAG(
-    'ml_pipeline_slurm',
+    "ml_pipeline_slurm",
     default_args=default_args,
-    description='Complete ML pipeline using Slurm executor',
-    schedule_interval='0 3 * * 1',  # Weekly on Mondays at 3 AM
+    description="Complete ML pipeline using Slurm executor",
+    schedule_interval="0 3 * * 1",  # Weekly on Mondays at 3 AM
     catchup=False,
     max_active_runs=1,
-    tags=['slurm', 'machine-learning', 'gpu', 'training']
+    tags=["slurm", "machine-learning", "gpu", "training"],
 )
+
 
 def check_data_availability():
     """Check if new training data is available."""
-    import os
     import random
-    
+
     # Simulate data availability check
     data_available = random.choice([True, True, False])  # 66% chance of data
-    
+
     if data_available:
         print("✓ New training data is available")
-        return 'prepare_training_data'
+        return "prepare_training_data"
     else:
         print("✗ No new training data available, skipping training")
-        return 'skip_training'
+        return "skip_training"
+
 
 # Start
-start = DummyOperator(task_id='start', dag=dag)
+start = DummyOperator(task_id="start", dag=dag)
 
 # Data availability check
 check_data = BranchPythonOperator(
-    task_id='check_data_availability',
+    task_id="check_data_availability",
     python_callable=check_data_availability,
     executor_config={
-        'slurm': {
-            'partition': 'normal',
-            'cpus_per_task': 1,
-            'mem': '256M',
-            'time_limit': '00:01:00',
+        "slurm": {
+            "partition": "normal",
+            "cpus_per_task": 1,
+            "mem": "256M",
+            "time_limit": "00:01:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Skip path for when no data is available
-skip_training = DummyOperator(
-    task_id='skip_training',
-    dag=dag
-)
+skip_training = DummyOperator(task_id="skip_training", dag=dag)
 
 # Data preparation - CPU intensive
 prepare_training_data = BashOperator(
-    task_id='prepare_training_data',
-    bash_command='''
+    task_id="prepare_training_data",
+    bash_command="""
     echo "=== Preparing Training Data ==="
-    
+
     WORK_DIR="/tmp/ml_pipeline_{{ ds_nodash }}"
     mkdir -p "$WORK_DIR/data" "$WORK_DIR/models" "$WORK_DIR/results"
-    
+
     echo "Creating synthetic dataset..."
-    
+
     # Generate synthetic training data
     python3 << 'EOF'
 import numpy as np
@@ -141,30 +140,30 @@ with open(f'{work_dir}/data/data_stats.json', 'w') as f:
 
 print("Data preparation completed!")
 EOF
-    
+
     echo "Data preparation completed successfully"
     echo "Files created:"
     ls -la "$WORK_DIR/data/"
-    ''',
+    """,
     executor_config={
-        'slurm': {
-            'partition': 'normal',
-            'cpus_per_task': 2,
-            'mem': '2G',
-            'time_limit': '00:10:00',
+        "slurm": {
+            "partition": "normal",
+            "cpus_per_task": 2,
+            "mem": "2G",
+            "time_limit": "00:10:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Feature engineering - CPU intensive
 feature_engineering = BashOperator(
-    task_id='feature_engineering',
-    bash_command='''
+    task_id="feature_engineering",
+    bash_command="""
     echo "=== Feature Engineering ==="
-    
+
     WORK_DIR="/tmp/ml_pipeline_{{ ds_nodash }}"
-    
+
     python3 << 'EOF'
 import pandas as pd
 import numpy as np
@@ -237,26 +236,26 @@ joblib.dump(pca, f'{work_dir}/models/pca.pkl')
 
 print("Feature engineering completed!")
 EOF
-    ''',
+    """,
     executor_config={
-        'slurm': {
-            'partition': 'normal',
-            'cpus_per_task': 4,
-            'mem': '4G',
-            'time_limit': '00:15:00',
+        "slurm": {
+            "partition": "normal",
+            "cpus_per_task": 4,
+            "mem": "4G",
+            "time_limit": "00:15:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Model training - potentially GPU intensive
 train_models = BashOperator(
-    task_id='train_models',
-    bash_command='''
+    task_id="train_models",
+    bash_command="""
     echo "=== Training Models ==="
-    
+
     WORK_DIR="/tmp/ml_pipeline_{{ ds_nodash }}"
-    
+
     python3 << 'EOF'
 import numpy as np
 import pandas as pd
@@ -285,7 +284,9 @@ print(f"Validation data shape: {X_val.shape}")
 # Define models to train
 models = {
     'logistic_regression': LogisticRegression(random_state=42, max_iter=1000),
-    'random_forest': RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1),
+    'random_forest': RandomForestClassifier(
+        n_estimators=100, random_state=42, n_jobs=-1
+    ),
     'gradient_boosting': GradientBoostingClassifier(n_estimators=100, random_state=42),
     'svm': SVC(probability=True, random_state=42)
 }
@@ -295,25 +296,25 @@ results = {}
 for model_name, model in models.items():
     print(f"\\nTraining {model_name}...")
     start_time = time.time()
-    
+
     # Train model
     model.fit(X_train, y_train)
-    
+
     # Predict on validation set
     val_pred = model.predict(X_val)
     val_prob = model.predict_proba(X_val)[:, 1]
-    
+
     # Calculate metrics
     val_auc = roc_auc_score(y_val, val_prob)
-    
+
     training_time = time.time() - start_time
-    
+
     print(f"  Training time: {training_time:.2f} seconds")
     print(f"  Validation AUC: {val_auc:.4f}")
-    
+
     # Save model
     joblib.dump(model, f'{work_dir}/models/{model_name}.pkl')
-    
+
     # Store results
     results[model_name] = {
         'val_auc': val_auc,
@@ -336,26 +337,26 @@ with open(f'{work_dir}/models/best_model.txt', 'w') as f:
 
 print("Model training completed!")
 EOF
-    ''',
+    """,
     executor_config={
-        'slurm': {
-            'partition': 'normal',  # Could be 'gpu' if available
-            'cpus_per_task': 8,     # More CPUs for parallel training
-            'mem': '8G',
-            'time_limit': '00:30:00',
+        "slurm": {
+            "partition": "normal",  # Could be 'gpu' if available
+            "cpus_per_task": 8,  # More CPUs for parallel training
+            "mem": "8G",
+            "time_limit": "00:30:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Model evaluation
 evaluate_models = BashOperator(
-    task_id='evaluate_models',
+    task_id="evaluate_models",
     bash_command='''
     echo "=== Model Evaluation ==="
-    
+
     WORK_DIR="/tmp/ml_pipeline_{{ ds_nodash }}"
-    
+
     python3 << 'EOF'
 import numpy as np
 import pandas as pd
@@ -436,36 +437,36 @@ print("Model evaluation completed!")
 EOF
     ''',
     executor_config={
-        'slurm': {
-            'partition': 'normal',
-            'cpus_per_task': 2,
-            'mem': '2G',
-            'time_limit': '00:10:00',
+        "slurm": {
+            "partition": "normal",
+            "cpus_per_task": 2,
+            "mem": "2G",
+            "time_limit": "00:10:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Model deployment preparation
 prepare_deployment = BashOperator(
-    task_id='prepare_deployment',
-    bash_command='''
+    task_id="prepare_deployment",
+    bash_command="""
     echo "=== Preparing Model for Deployment ==="
-    
+
     WORK_DIR="/tmp/ml_pipeline_{{ ds_nodash }}"
     DEPLOY_DIR="$WORK_DIR/deployment"
     mkdir -p "$DEPLOY_DIR"
-    
+
     # Get best model name
     BEST_MODEL=$(cat "$WORK_DIR/models/best_model.txt")
     echo "Best model: $BEST_MODEL"
-    
+
     # Copy model artifacts
     cp "$WORK_DIR/models/$BEST_MODEL.pkl" "$DEPLOY_DIR/model.pkl"
     cp "$WORK_DIR/models/scaler.pkl" "$DEPLOY_DIR/"
     cp "$WORK_DIR/models/poly_features.pkl" "$DEPLOY_DIR/"
     cp "$WORK_DIR/models/pca.pkl" "$DEPLOY_DIR/"
-    
+
     # Create deployment manifest
     cat > "$DEPLOY_DIR/manifest.json" << EOF
 {
@@ -474,7 +475,7 @@ prepare_deployment = BashOperator(
     "created_date": "{{ ds }}",
     "artifacts": [
         "model.pkl",
-        "scaler.pkl", 
+        "scaler.pkl",
         "poly_features.pkl",
         "pca.pkl"
     ],
@@ -482,7 +483,7 @@ prepare_deployment = BashOperator(
     "preprocessing_required": true
 }
 EOF
-    
+
     # Create prediction script
     cat > "$DEPLOY_DIR/predict.py" << 'EOF'
 import joblib
@@ -495,17 +496,17 @@ class ModelPredictor:
         self.scaler = joblib.load(f"{model_dir}/scaler.pkl")
         self.poly = joblib.load(f"{model_dir}/poly_features.pkl")
         self.pca = joblib.load(f"{model_dir}/pca.pkl")
-    
+
     def predict(self, X):
         # Apply preprocessing pipeline
         X_scaled = self.scaler.transform(X)
         X_poly = self.poly.transform(X_scaled)
         X_pca = self.pca.transform(X_poly)
-        
+
         # Make prediction
         predictions = self.model.predict(X_pca)
         probabilities = self.model.predict_proba(X_pca)
-        
+
         return predictions, probabilities
 
 if __name__ == "__main__":
@@ -513,58 +514,63 @@ if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python predict.py <model_dir>")
         sys.exit(1)
-    
+
     model_dir = sys.argv[1]
     predictor = ModelPredictor(model_dir)
     print(f"Model loaded successfully from {model_dir}")
 EOF
-    
+
     echo "Deployment package prepared:"
     ls -la "$DEPLOY_DIR"
-    
+
     echo "Deployment ready at: $DEPLOY_DIR"
-    ''',
-    dag=dag
+    """,
+    dag=dag,
 )
 
 # Cleanup (with trigger rule to run regardless of upstream success)
 cleanup = BashOperator(
-    task_id='cleanup',
-    bash_command='''
+    task_id="cleanup",
+    bash_command="""
     echo "=== Cleanup ==="
     WORK_DIR="/tmp/ml_pipeline_{{ ds_nodash }}"
-    
+
     if [ -d "$WORK_DIR" ]; then
         echo "Workspace size before cleanup:"
         du -sh "$WORK_DIR"
-        
+
         # Keep results and deployment, remove large temporary files
         find "$WORK_DIR/data" -name "*.npy" -delete
         find "$WORK_DIR/data" -name "*.csv" -delete
-        
+
         echo "Workspace size after cleanup:"
         du -sh "$WORK_DIR"
-        
+
         echo "Remaining files:"
         find "$WORK_DIR" -type f | head -20
     fi
-    ''',
+    """,
     trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
-    dag=dag
+    dag=dag,
 )
 
 # End
 end = DummyOperator(
-    task_id='end',
-    trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
-    dag=dag
+    task_id="end", trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS, dag=dag
 )
 
 # Define dependencies
 start >> check_data
 
 # Main pipeline path
-check_data >> prepare_training_data >> feature_engineering >> train_models >> evaluate_models >> prepare_deployment
+(
+    check_data
+    >> prepare_training_data
+    >> feature_engineering
+    >> train_models
+    >> evaluate_models
+    >> prepare_deployment
+)
 
 # Skip path
 check_data >> skip_training

@@ -19,13 +19,13 @@ This directory contains comprehensive examples demonstrating various use cases a
 4. **Enable the Slurm Executor** in `airflow.cfg`:
    ```ini
    [core]
-   executor = airflow_slurm_executor.slurm_executor.SlurmExecutor
+   executor = airflow_provider_slurm.slurm_executor.SlurmExecutor
    ```
 
 ## 📁 Example DAGs Overview
 
 ### 1. Basic Slurm DAG (`01_basic_slurm_dag.py`)
-**Complexity**: Beginner  
+**Complexity**: Beginner
 **Use Case**: Introduction to Slurm executor basics
 
 **Features**:
@@ -34,7 +34,7 @@ This directory contains comprehensive examples demonstrating various use cases a
 - Resource configuration examples
 - File cleanup patterns
 
-**Resources**: 1 CPU, 512MB-1GB RAM, normal partition  
+**Resources**: 1 CPU, 512MB-1GB RAM, normal partition
 **Duration**: ~10 minutes
 
 ```python
@@ -50,7 +50,7 @@ executor_config = {
 ```
 
 ### 2. Parallel Processing DAG (`02_parallel_processing_dag.py`)
-**Complexity**: Intermediate  
+**Complexity**: Intermediate
 **Use Case**: Data processing with parallel tasks
 
 **Features**:
@@ -60,7 +60,7 @@ executor_config = {
 - Data aggregation and quality checks
 - Resource optimization patterns
 
-**Resources**: 1-2 CPUs, 512MB-2GB RAM per task  
+**Resources**: 1-2 CPUs, 512MB-2GB RAM per task
 **Duration**: ~20 minutes
 
 **Key Concepts**:
@@ -69,7 +69,7 @@ executor_config = {
 - Data validation and quality assurance
 
 ### 3. Machine Learning Pipeline (`03_machine_learning_pipeline.py`)
-**Complexity**: Advanced  
+**Complexity**: Advanced
 **Use Case**: Complete ML workflow with different computational stages
 
 **Features**:
@@ -79,7 +79,7 @@ executor_config = {
 - Model deployment preparation
 - Resource scaling based on workload
 
-**Resources**: 1-8 CPUs, 256MB-8GB RAM depending on stage  
+**Resources**: 1-8 CPUs, 256MB-8GB RAM depending on stage
 **Duration**: ~45 minutes
 
 **Stages**:
@@ -90,7 +90,7 @@ executor_config = {
 5. **Deployment Prep** (1 CPU, 512MB) - Artifact packaging
 
 ### 4. Bioinformatics Workflow (`04_bioinformatics_workflow.py`)
-**Complexity**: Advanced  
+**Complexity**: Advanced
 **Use Case**: Genomic data processing pipeline
 
 **Features**:
@@ -101,7 +101,7 @@ executor_config = {
 - Variant calling and annotation
 - Comprehensive reporting
 
-**Resources**: 1-8 CPUs, 1GB-16GB RAM per task  
+**Resources**: 1-8 CPUs, 1GB-16GB RAM per task
 **Duration**: 1-3 hours
 
 **Typical Bioinformatics Steps**:
@@ -112,7 +112,7 @@ executor_config = {
 5. **Reporting** (1 CPU, 512MB) - HTML report generation
 
 ### 5. Distributed Computing DAG (`05_distributed_computing_dag.py`)
-**Complexity**: Expert  
+**Complexity**: Expert
 **Use Case**: Large-scale distributed processing with dynamic resource allocation
 
 **Features**:
@@ -122,12 +122,12 @@ executor_config = {
 - Performance monitoring and analysis
 - Resource optimization strategies
 
-**Resources**: Variable (2-16 partitions, different CPU/memory configs)  
+**Resources**: Variable (2-16 partitions, different CPU/memory configs)
 **Duration**: 30 minutes - 2 hours
 
 **Processing Types**:
 - **CPU-Intensive Tasks**: 4 CPUs, normal partition
-- **Memory-Intensive Tasks**: 2 CPUs, 16GB RAM, normal partition  
+- **Memory-Intensive Tasks**: 2 CPUs, 16GB RAM, normal partition
 - **Long-Running Tasks**: 2 CPUs, 4GB RAM, long partition
 
 ## ⚙️ Configuration
@@ -136,7 +136,7 @@ executor_config = {
 
 ```ini
 [core]
-executor = airflow_slurm_executor.slurm_executor.SlurmExecutor
+executor = airflow_provider_slurm.slurm_executor.SlurmExecutor
 
 [slurm]
 # Slurm REST API configuration
@@ -296,21 +296,21 @@ cat /path/to/airflow/logs/dag_id/task_id/run_id/1.log
 
 ### Common Issues and Solutions
 
-**Issue**: Jobs stuck in PENDING  
+**Issue**: Jobs stuck in PENDING
 **Solution**: Check partition availability and resource requests
 ```bash
 sinfo  # Check partition status
 squeue --start  # Check estimated start times
 ```
 
-**Issue**: Jobs fail immediately  
+**Issue**: Jobs fail immediately
 **Solution**: Check file permissions and shared filesystem
 ```bash
 # Test shared filesystem
 touch /shared/test_file_$(date +%s)
 ```
 
-**Issue**: Authentication failures  
+**Issue**: Authentication failures
 **Solution**: Verify JWT token and scontrol access
 ```bash
 scontrol token  # Generate new token
@@ -388,7 +388,7 @@ def process_data(**context):
 
 ### 2. Error Handling
 - Implement proper retry logic
-- Use trigger rules for complex dependencies  
+- Use trigger rules for complex dependencies
 - Include cleanup tasks for temporary files
 - Monitor for stuck jobs and implement timeouts
 
@@ -408,8 +408,8 @@ def process_data(**context):
 
 - **Slurm Documentation**: https://slurm.schedmd.com/documentation.html
 - **Airflow Documentation**: https://airflow.apache.org/docs/
-- **Executor Repository**: https://github.com/your-org/airflow-slurm-executor
-- **Issues and Support**: https://github.com/your-org/airflow-slurm-executor/issues
+- **Executor Repository**: https://github.com/JonTK/airflow-provider-slurm
+- **Issues and Support**: https://github.com/JonTK/airflow-provider-slurm/issues
 
 ## 🤝 Contributing
 

@@ -1,0 +1,38 @@
+{
+  "ignorePatterns": [
+    {
+      "pattern": "^http://localhost"
+    },
+    {
+      "pattern": "^https://your-slurm-cluster"
+    },
+    {
+      "pattern": "^https://slurm-head\\.example\\.com"
+    },
+    {
+      "pattern": "^https://slurm-head"
+    },
+    {
+      "pattern": "^https://github\\.com/your-org/"
+    },
+    {
+      "pattern": "CODE_OF_CONDUCT\\.md$"
+    },
+    {
+      "pattern": "docs/configuration\\.md$"
+    },
+    {
+      "pattern": "docs/installation\\.md$"
+    },
+    {
+      "pattern": "docs/troubleshooting\\.md$"
+    }
+  ],
+  "replacementPatterns": [],
+  "httpHeaders": [],
+  "timeout": "10s",
+  "retryOn429": true,
+  "retryCount": 3,
+  "fallbackRetryDelay": "30s",
+  "aliveStatusCodes": [200, 206]
+}

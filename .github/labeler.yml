@@ -1,0 +1,126 @@
+# Configuration for PR labeler
+# Label PRs based on which files are modified
+
+# Core executor code
+'component:executor':
+  - changed-files:
+    - any-glob-to-any-file: 'airflow_provider_slurm/**/*.py'
+    - all-globs-to-all-files: '!airflow_provider_slurm/**/test_*.py'
+
+# API client code
+'component:api-client':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'airflow_provider_slurm/**/api*.py'
+      - 'airflow_provider_slurm/**/client*.py'
+
+# Token management
+'component:auth':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'airflow_provider_slurm/**/token*.py'
+      - 'airflow_provider_slurm/**/auth*.py'
+
+# Tests
+'tests':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'tests/**/*'
+      - '**/test_*.py'
+      - 'airflow_provider_slurm/**/test_*.py'
+
+# Unit tests specifically
+'tests:unit':
+  - changed-files:
+    - any-glob-to-any-file: 'tests/unit/**/*'
+
+# Integration tests
+'tests:integration':
+  - changed-files:
+    - any-glob-to-any-file: 'tests/integration/**/*'
+
+# Documentation
+'documentation':
+  - changed-files:
+    - any-glob-to-any-file:
+      - '*.md'
+      - 'docs/**/*'
+      - '**/*.rst'
+      - 'mkdocs.yml'
+      - 'readthedocs.yml'
+
+# Configuration files
+'config':
+  - changed-files:
+    - any-glob-to-any-file:
+      - '*.ini'
+      - '*.cfg'
+      - '*.conf'
+      - 'airflow.cfg'
+      - '**/config*.py'
+
+# Examples and DAGs
+'examples':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'examples/**/*'
+      - '**/example_*.py'
+      - 'dags/**/*'
+
+# CI/CD
+'ci/cd':
+  - changed-files:
+    - any-glob-to-any-file:
+      - '.github/**/*'
+      - '.gitlab-ci.yml'
+      - 'Jenkinsfile'
+      - '*.yml'
+      - '*.yaml'
+
+# Dependencies
+'dependencies':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'requirements*.txt'
+      - 'setup.py'
+      - 'setup.cfg'
+      - 'pyproject.toml'
+      - 'Pipfile'
+      - 'Pipfile.lock'
+      - 'poetry.lock'
+
+# Build and packaging
+'build':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'setup.py'
+      - 'setup.cfg'
+      - 'pyproject.toml'
+      - 'MANIFEST.in'
+      - 'Makefile'
+
+# Docker
+'docker':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'Dockerfile*'
+      - 'docker-compose*.yml'
+      - '.dockerignore'
+
+# Security
+'security':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'SECURITY.md'
+      - '**/security*.py'
+
+# Community health files
+'community':
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'CODE_OF_CONDUCT.md'
+      - 'CONTRIBUTING.md'
+      - 'SECURITY.md'
+      - '.github/ISSUE_TEMPLATE/**/*'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+      - 'LICENSE*'

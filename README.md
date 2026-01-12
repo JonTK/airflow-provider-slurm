@@ -29,9 +29,9 @@ Execute Apache Airflow tasks on High-Performance Computing (HPC) clusters using 
 
 ## Requirements
 
-- **Python**: 3.8, 3.9, 3.10, 3.11
+- **Python**: 3.9, 3.10, 3.11
 - **Apache Airflow**: 2.5.0+ (including 3.x support)
-- **Slurm**: 20.02+ with REST API (slurmrestd) v0.0.40-v0.0.44  
+- **Slurm**: 23.11+ (REST API v0.0.40) to 25.11+ (REST API v0.0.44)
 - **System**: `scontrol` binary available in PATH
 - **Storage**: Shared filesystem between Airflow and Slurm compute nodes
 
@@ -48,7 +48,7 @@ pip install airflow-provider-slurm
 ```ini
 # airflow.cfg
 [core]
-executor = airflow_slurm_executor.SlurmExecutor
+executor = airflow_provider_slurm.SlurmExecutor
 
 [slurm]
 api_url = https://your-slurm-cluster:6820
@@ -67,7 +67,7 @@ with DAG(
     start_date=datetime(2024, 1, 1),
     schedule=None,
 ) as dag:
-    
+
     @task(executor_config={
         'partition': 'gpu',
         'cpus_per_task': 4,
@@ -78,7 +78,7 @@ with DAG(
         import torch
         # Your GPU workload here
         return "Task completed on Slurm!"
-    
+
     gpu_task()
 ```
 

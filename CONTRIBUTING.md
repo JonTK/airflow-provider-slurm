@@ -88,7 +88,7 @@ isort .
 - Use type hints for all function signatures
 - Run mypy for type checking:
   ```bash
-  mypy airflow_slurm_executor
+  mypy airflow_provider_slurm
   ```
 
 ### Documentation
@@ -124,7 +124,7 @@ docs: update installation instructions
 pytest
 
 # Run with coverage
-pytest --cov=airflow_slurm_executor
+pytest --cov=airflow_provider_slurm
 
 # Run specific test file
 pytest tests/test_executor.py
@@ -164,7 +164,7 @@ Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Questions?
 
-- Open a [Discussion](https://github.com/JonTK/airflow-provider-slurm/discussions)
+- Open an [Issue](https://github.com/JonTK/airflow-provider-slurm/issues) for questions or help
 - Check existing issues and documentation
 
 ## License

@@ -1,0 +1,36 @@
+# CODEOWNERS file
+# This file defines who should be automatically requested for review
+# when pull requests modify specific parts of the codebase.
+
+# Default owners for everything in the repo
+* @JonTK
+
+# Core executor code
+/airflow_provider_slurm/ @JonTK
+
+# API client
+/airflow_provider_slurm/api*.py @JonTK
+/airflow_provider_slurm/client*.py @JonTK
+
+# Tests
+/tests/ @JonTK
+
+# Documentation
+*.md @JonTK
+/docs/ @JonTK
+
+# CI/CD workflows
+/.github/ @JonTK
+
+# Security-sensitive files
+/SECURITY.md @JonTK
+/.github/workflows/codeql.yml @JonTK
+/.github/dependabot.yml @JonTK
+
+# Release and packaging
+/setup.py @JonTK
+/pyproject.toml @JonTK
+/.github/workflows/release.yml @JonTK
+
+# Examples
+/examples/ @JonTK

@@ -146,7 +146,7 @@ Related to #
 - [ ] I have updated the CHANGELOG.md (if applicable)
 - [ ] I have verified this change works with supported Python versions (3.8-3.11)
 - [ ] I have verified this change works with supported Airflow versions (2.5.0+)
-- [ ] I have verified this change works with supported Slurm API versions (v0.0.40-v0.0.44)
+- [ ] I have verified this change works with supported Slurm versions (23.11-25.11, API v0.0.40-v0.0.44)
 
 ## Screenshots/Logs
 
