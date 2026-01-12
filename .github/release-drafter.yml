@@ -82,7 +82,7 @@ template: |
 
   ## Compatibility
 
-  - Python: 3.8, 3.9, 3.10, 3.11
+  - Python: 3.9, 3.10, 3.11
   - Apache Airflow: 2.5.0+
   - Slurm: 23.11+ (REST API v0.0.40) to 25.11+ (REST API v0.0.44)
 

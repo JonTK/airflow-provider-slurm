@@ -36,7 +36,7 @@ Initial alpha release of `airflow-provider-slurm`.
 
 ### Technical Details
 - **API Compatibility**: Slurm 23.11-25.11 (REST API v0.0.40-v0.0.44)
-- **Python Support**: 3.8, 3.9, 3.10, 3.11
+- **Python Support**: 3.9, 3.10, 3.11
 - **Airflow Support**: 2.5.0+ and 3.x
 - **Live Testing**: Jobs successfully completed on Slurm 25.11.1
 
@@ -81,7 +81,7 @@ Initial alpha release of `airflow-provider-slurm`.
 - Integration test framework with mocked Slurm
 - Pre-commit hooks for code quality
 - CI/CD pipeline with GitHub Actions
-- Multi-Python version testing (3.8-3.11)
+- Multi-Python version testing (3.9-3.11)
 - Multi-Airflow version testing (2.5.0+)
 
 #### Documentation & Examples
@@ -118,7 +118,7 @@ Initial alpha release of `airflow-provider-slurm`.
 - Detailed error logging and debugging support
 
 #### Requirements
-- Python 3.8+
+- Python 3.9+
 - Apache Airflow 2.5.0+
 - Slurm cluster with REST API (slurmrestd) v0.0.42+
 - `scontrol` binary in PATH
