@@ -55,6 +55,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install apache-airflow==${{ matrix.airflow-version }}
         pip install -e ".[dev]"
+        pip install -r requirements-dev.txt
 
     - name: Lint with flake8
       run: |
@@ -134,6 +135,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install apache-airflow==2.8.0
         pip install -e ".[dev]"
+        pip install -r requirements-dev.txt
 
     - name: Run integration tests (mocked)
       run: |
