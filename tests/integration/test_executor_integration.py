@@ -33,14 +33,13 @@ class TestSlurmExecutorIntegration:
             mock_conf.getfloat.return_value = 10.0
 
             # Mock components
-            with patch(
-                "airflow_provider_slurm.slurm_executor.SlurmTokenManager"
-            ), patch(
-                "airflow_provider_slurm.slurm_executor.SlurmAPIClient"
-            ) as mock_client_class, patch(
-                "pathlib.Path.touch"
-            ), patch(
-                "os.remove"
+            with (
+                patch("airflow_provider_slurm.slurm_executor.SlurmTokenManager"),
+                patch(
+                    "airflow_provider_slurm.slurm_executor.SlurmAPIClient"
+                ) as mock_client_class,
+                patch("pathlib.Path.touch"),
+                patch("os.remove"),
             ):
                 # Setup mock client
                 mock_client = MagicMock()
@@ -85,11 +84,12 @@ class TestSlurmExecutorIntegration:
             mock_conf.getint.return_value = 10
             mock_conf.getfloat.return_value = 10.0
 
-            with patch(
-                "airflow_provider_slurm.slurm_executor.SlurmTokenManager"
-            ), patch(
-                "airflow_provider_slurm.slurm_executor.SlurmAPIClient"
-            ) as mock_client_class:
+            with (
+                patch("airflow_provider_slurm.slurm_executor.SlurmTokenManager"),
+                patch(
+                    "airflow_provider_slurm.slurm_executor.SlurmAPIClient"
+                ) as mock_client_class,
+            ):
                 # Setup mock client that fails ping
                 mock_client = MagicMock()
                 mock_client.ping.return_value = False
@@ -114,14 +114,13 @@ class TestSlurmExecutorIntegration:
             mock_conf.getfloat.return_value = 1.0  # Fast sync for testing
 
             # Mock successful operations
-            with patch(
-                "airflow_provider_slurm.slurm_executor.SlurmTokenManager"
-            ), patch(
-                "airflow_provider_slurm.slurm_executor.SlurmAPIClient"
-            ) as mock_client_class, patch(
-                "pathlib.Path.touch"
-            ), patch(
-                "os.remove"
+            with (
+                patch("airflow_provider_slurm.slurm_executor.SlurmTokenManager"),
+                patch(
+                    "airflow_provider_slurm.slurm_executor.SlurmAPIClient"
+                ) as mock_client_class,
+                patch("pathlib.Path.touch"),
+                patch("os.remove"),
             ):
                 mock_client = MagicMock()
                 mock_client.ping.return_value = True
