@@ -32,7 +32,7 @@ jobs:
 
     - name: Run tests
       run: |
-        pytest tests/unit/ --cov=airflow_slurm_executor
+        pytest tests/unit/ --cov=airflow_provider_slurm
 
   build:
     runs-on: ubuntu-latest

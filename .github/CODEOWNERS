@@ -6,11 +6,11 @@
 * @JonTK
 
 # Core executor code
-/airflow_slurm_executor/ @JonTK
+/airflow_provider_slurm/ @JonTK
 
 # API client
-/airflow_slurm_executor/api*.py @JonTK
-/airflow_slurm_executor/client*.py @JonTK
+/airflow_provider_slurm/api*.py @JonTK
+/airflow_provider_slurm/client*.py @JonTK
 
 # Tests
 /tests/ @JonTK

@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from airflow_slurm_executor.exceptions import SlurmTokenError
-from airflow_slurm_executor.slurm_token_manager import SlurmTokenManager
+from airflow_provider_slurm.exceptions import SlurmTokenError
+from airflow_provider_slurm.slurm_token_manager import SlurmTokenManager
 
 
 class TestSlurmTokenManager:

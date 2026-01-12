@@ -59,24 +59,24 @@ jobs:
 
     - name: Lint with flake8
       run: |
-        flake8 airflow_slurm_executor tests --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 airflow_slurm_executor tests --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
+        flake8 airflow_provider_slurm tests --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 airflow_provider_slurm tests --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
 
     - name: Check formatting with black
       run: |
-        black --check airflow_slurm_executor tests
+        black --check airflow_provider_slurm tests
 
     - name: Check import sorting with isort
       run: |
-        isort --check-only airflow_slurm_executor tests
+        isort --check-only airflow_provider_slurm tests
 
     - name: Type check with mypy
       run: |
-        mypy airflow_slurm_executor
+        mypy airflow_provider_slurm
 
     - name: Test with pytest
       run: |
-        pytest tests/unit/ --cov=airflow_slurm_executor --cov-report=xml --cov-report=term-missing --cov-report=html --junitxml=pytest-results.xml
+        pytest tests/unit/ --cov=airflow_provider_slurm --cov-report=xml --cov-report=term-missing --cov-report=html --junitxml=pytest-results.xml
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4

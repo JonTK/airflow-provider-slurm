@@ -8,8 +8,8 @@ from urllib.parse import urljoin
 
 import requests
 
-from airflow_slurm_executor.exceptions import SlurmAPIError
-from airflow_slurm_executor.slurm_token_manager import SlurmTokenManager
+from airflow_provider_slurm.exceptions import SlurmAPIError
+from airflow_provider_slurm.slurm_token_manager import SlurmTokenManager
 
 logger = logging.getLogger(__name__)
 

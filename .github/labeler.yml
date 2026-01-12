@@ -4,22 +4,22 @@
 # Core executor code
 'component:executor':
   - changed-files:
-    - any-glob-to-any-file: 'airflow_slurm_executor/**/*.py'
-    - all-globs-to-all-files: '!airflow_slurm_executor/**/test_*.py'
+    - any-glob-to-any-file: 'airflow_provider_slurm/**/*.py'
+    - all-globs-to-all-files: '!airflow_provider_slurm/**/test_*.py'
 
 # API client code
 'component:api-client':
   - changed-files:
     - any-glob-to-any-file:
-      - 'airflow_slurm_executor/**/api*.py'
-      - 'airflow_slurm_executor/**/client*.py'
+      - 'airflow_provider_slurm/**/api*.py'
+      - 'airflow_provider_slurm/**/client*.py'
 
 # Token management
 'component:auth':
   - changed-files:
     - any-glob-to-any-file:
-      - 'airflow_slurm_executor/**/token*.py'
-      - 'airflow_slurm_executor/**/auth*.py'
+      - 'airflow_provider_slurm/**/token*.py'
+      - 'airflow_provider_slurm/**/auth*.py'
 
 # Tests
 'tests':
@@ -27,7 +27,7 @@
     - any-glob-to-any-file:
       - 'tests/**/*'
       - '**/test_*.py'
-      - 'airflow_slurm_executor/**/test_*.py'
+      - 'airflow_provider_slurm/**/test_*.py'
 
 # Unit tests specifically
 'tests:unit':

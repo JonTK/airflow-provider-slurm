@@ -38,19 +38,19 @@ test:
 	pytest
 
 test-cov:
-	pytest --cov=airflow_slurm_executor --cov-report=html --cov-report=term
+	pytest --cov=airflow_provider_slurm --cov-report=html --cov-report=term
 
 lint:
-	flake8 airflow_slurm_executor tests
-	black --check airflow_slurm_executor tests
-	isort --check-only airflow_slurm_executor tests
+	flake8 airflow_provider_slurm tests
+	black --check airflow_provider_slurm tests
+	isort --check-only airflow_provider_slurm tests
 
 format:
-	black airflow_slurm_executor tests
-	isort airflow_slurm_executor tests
+	black airflow_provider_slurm tests
+	isort airflow_provider_slurm tests
 
 type-check:
-	mypy airflow_slurm_executor
+	mypy airflow_provider_slurm
 
 build: clean
 	python -m build

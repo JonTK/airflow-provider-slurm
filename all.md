@@ -1733,7 +1733,7 @@ executor = airflow.contrib.executors.slurm_executor.SlurmExecutor
 
 **Package structure:**
 ```
-airflow_slurm_executor/
+airflow_provider_slurm/
 ├── __init__.py
 ├── slurm_executor.py      # Main SlurmExecutor class
 ├── slurm_api_client.py    # SlurmAPIClient class
@@ -2863,7 +2863,7 @@ airflow-slurm-executor/
 │   └── workflows/
 │       ├── tests.yml
 │       └── publish.yml
-├── airflow_slurm_executor/
+├── airflow_provider_slurm/
 │   ├── __init__.py
 │   ├── slurm_executor.py          # Main SlurmExecutor class
 │   ├── slurm_api_client.py        # SlurmAPIClient class
@@ -3028,7 +3028,7 @@ Enable debug logging:
 
 python
 import logging
-logging.getLogger('airflow_slurm_executor').setLevel(logging.DEBUG)
+logging.getLogger('airflow_provider_slurm').setLevel(logging.DEBUG)
 Check Slurm job details:
 
 bash
@@ -4220,7 +4220,7 @@ Configure Airflow:
 ini
 # airflow.cfg
 [core]
-executor = airflow_slurm_executor.SlurmExecutor
+executor = airflow_provider_slurm.SlurmExecutor
 
 [slurm]
 api_url = https://your-slurm-cluster:6820

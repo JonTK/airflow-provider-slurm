@@ -13,13 +13,13 @@ from airflow.configuration import conf
 from airflow.executors.base_executor import BaseExecutor
 from airflow.models.taskinstance import TaskInstance, TaskInstanceKey
 
-from airflow_slurm_executor.exceptions import (
+from airflow_provider_slurm.exceptions import (
     SlurmAPIError,
     SlurmConfigurationError,
     SlurmJobSubmissionError,
 )
-from airflow_slurm_executor.slurm_api_client import SlurmAPIClient
-from airflow_slurm_executor.slurm_token_manager import SlurmTokenManager
+from airflow_provider_slurm.slurm_api_client import SlurmAPIClient
+from airflow_provider_slurm.slurm_token_manager import SlurmTokenManager
 
 logger = logging.getLogger(__name__)
 

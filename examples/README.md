@@ -19,7 +19,7 @@ This directory contains comprehensive examples demonstrating various use cases a
 4. **Enable the Slurm Executor** in `airflow.cfg`:
    ```ini
    [core]
-   executor = airflow_slurm_executor.slurm_executor.SlurmExecutor
+   executor = airflow_provider_slurm.slurm_executor.SlurmExecutor
    ```
 
 ## 📁 Example DAGs Overview
@@ -136,7 +136,7 @@ executor_config = {
 
 ```ini
 [core]
-executor = airflow_slurm_executor.slurm_executor.SlurmExecutor
+executor = airflow_provider_slurm.slurm_executor.SlurmExecutor
 
 [slurm]
 # Slurm REST API configuration

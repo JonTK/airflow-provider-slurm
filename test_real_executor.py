@@ -10,8 +10,8 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, "/home/jontk/src/github.com/jontk/airflow-slurm-executor")
 
 from airflow.models.taskinstance import TaskInstanceKey
-from airflow_slurm_executor.slurm_executor import SlurmExecutor
-from airflow_slurm_executor.slurm_token_manager import SlurmTokenManager
+from airflow_provider_slurm.slurm_executor import SlurmExecutor
+from airflow_provider_slurm.slurm_token_manager import SlurmTokenManager
 
 BASE_URL = "http://rocky9.ar.jontk.com:6820"
 TEST_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjY2Nzg5NjEsImlhdCI6MTc2NjY3NzE2MSwic3VuIjoicm9vdCJ9.FRcLY-j8uao80Obc51d7LgZd3Ql_Oan3H8anIVCjuAg"
@@ -22,7 +22,7 @@ def main():
     print("-" * 35)
 
     # Mock Airflow config
-    with patch("airflow_slurm_executor.slurm_executor.conf") as mock_conf:
+    with patch("airflow_provider_slurm.slurm_executor.conf") as mock_conf:
         mock_conf.get.side_effect = lambda section, key, fallback=None: {
             ("slurm", "api_url"): BASE_URL,
             ("slurm", "username"): "root",

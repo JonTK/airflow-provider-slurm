@@ -8,7 +8,7 @@ Add the following to your `airflow.cfg`:
 
 ```ini
 [core]
-executor = airflow_slurm_executor.SlurmExecutor
+executor = airflow_provider_slurm.SlurmExecutor
 
 [slurm]
 # Slurm REST API URL
@@ -92,7 +92,7 @@ Tokens are cached and automatically refreshed when they expire. The default toke
 You can provide a custom token manager:
 
 ```python
-from airflow_slurm_executor import SlurmExecutor, SlurmTokenManager
+from airflow_provider_slurm import SlurmExecutor, SlurmTokenManager
 
 class CustomTokenManager(SlurmTokenManager):
     def get_token(self):

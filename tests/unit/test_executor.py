@@ -9,12 +9,12 @@ import pytest
 from airflow.models.taskinstance import TaskInstanceKey
 from airflow.utils.state import TaskInstanceState
 
-from airflow_slurm_executor.exceptions import (
+from airflow_provider_slurm.exceptions import (
     SlurmAPIError,
     SlurmConfigurationError,
     SlurmJobSubmissionError,
 )
-from airflow_slurm_executor.slurm_executor import SlurmExecutor
+from airflow_provider_slurm.slurm_executor import SlurmExecutor
 
 
 class TestSlurmExecutor:
@@ -23,7 +23,7 @@ class TestSlurmExecutor:
     @pytest.fixture
     def mock_conf(self):
         """Mock Airflow configuration."""
-        with patch("airflow_slurm_executor.slurm_executor.conf") as mock:
+        with patch("airflow_provider_slurm.slurm_executor.conf") as mock:
             # Set default configuration values
             mock.get.side_effect = lambda section, key, fallback=None: {
                 ("slurm", "api_url"): "https://slurm.example.com:6820",
@@ -76,8 +76,8 @@ class TestSlurmExecutor:
         assert executor.running == {}
         assert executor.last_sync_time == 0.0
 
-    @patch("airflow_slurm_executor.slurm_executor.SlurmTokenManager")
-    @patch("airflow_slurm_executor.slurm_executor.SlurmAPIClient")
+    @patch("airflow_provider_slurm.slurm_executor.SlurmTokenManager")
+    @patch("airflow_provider_slurm.slurm_executor.SlurmAPIClient")
     def test_start_success(
         self, mock_api_client, mock_token_manager, executor, mock_conf
     ):
@@ -105,8 +105,8 @@ class TestSlurmExecutor:
 
         assert "API URL not configured" in str(exc_info.value)
 
-    @patch("airflow_slurm_executor.slurm_executor.SlurmTokenManager")
-    @patch("airflow_slurm_executor.slurm_executor.SlurmAPIClient")
+    @patch("airflow_provider_slurm.slurm_executor.SlurmTokenManager")
+    @patch("airflow_provider_slurm.slurm_executor.SlurmAPIClient")
     def test_start_api_not_reachable(
         self, mock_api_client, mock_token_manager, executor
     ):
@@ -121,7 +121,7 @@ class TestSlurmExecutor:
 
         assert "Cannot connect to Slurm API" in str(exc_info.value)
 
-    @patch("airflow_slurm_executor.slurm_executor.SlurmAPIClient")
+    @patch("airflow_provider_slurm.slurm_executor.SlurmAPIClient")
     def test_execute_async_success(self, mock_api_client, executor, task_key):
         """Test successful task submission."""
         # Setup mock client
@@ -138,7 +138,7 @@ class TestSlurmExecutor:
         assert executor.running[task_key]["slurm_job_id"] == 12345
         assert executor.running[task_key]["command"] == command
 
-    @patch("airflow_slurm_executor.slurm_executor.SlurmAPIClient")
+    @patch("airflow_provider_slurm.slurm_executor.SlurmAPIClient")
     def test_execute_async_submission_failure(
         self, mock_api_client, executor, task_key
     ):
@@ -245,7 +245,7 @@ class TestSlurmExecutor:
         assert job_spec["job"]["memory_per_node"] == "16G"
         assert job_spec["job"]["partition"] == "gpu"
 
-    @patch("airflow_slurm_executor.slurm_executor.SlurmAPIClient")
+    @patch("airflow_provider_slurm.slurm_executor.SlurmAPIClient")
     def test_sync_completed_job(self, mock_api_client, executor, task_key):
         """Test sync with completed job."""
         # Setup running job
@@ -279,7 +279,7 @@ class TestSlurmExecutor:
         executor.success.assert_called_once_with(task_key)
         assert task_key not in executor.running
 
-    @patch("airflow_slurm_executor.slurm_executor.SlurmAPIClient")
+    @patch("airflow_provider_slurm.slurm_executor.SlurmAPIClient")
     def test_sync_failed_job(self, mock_api_client, executor, task_key):
         """Test sync with failed job."""
         # Setup running job
@@ -313,7 +313,7 @@ class TestSlurmExecutor:
         executor.fail.assert_called_once_with(task_key)
         assert task_key not in executor.running
 
-    @patch("airflow_slurm_executor.slurm_executor.SlurmAPIClient")
+    @patch("airflow_provider_slurm.slurm_executor.SlurmAPIClient")
     def test_sync_missing_job_timeout(self, mock_api_client, executor, task_key):
         """Test sync with missing job that times out."""
         # Setup running job that's been missing for a while
@@ -356,7 +356,7 @@ class TestSlurmExecutor:
 
         mock_client.get_jobs.assert_not_called()
 
-    @patch("airflow_slurm_executor.slurm_executor.SlurmAPIClient")
+    @patch("airflow_provider_slurm.slurm_executor.SlurmAPIClient")
     def test_end_cancel_mode(self, mock_api_client, executor, task_key):
         """Test graceful shutdown in cancel mode."""
         # Setup running jobs
@@ -382,7 +382,7 @@ class TestSlurmExecutor:
         assert len(executor.running) == 0
 
     @patch("time.sleep")
-    @patch("airflow_slurm_executor.slurm_executor.SlurmAPIClient")
+    @patch("airflow_provider_slurm.slurm_executor.SlurmAPIClient")
     def test_end_wait_mode(self, mock_api_client, mock_sleep, executor, task_key):
         """Test graceful shutdown in wait mode."""
         # Setup running job
@@ -424,7 +424,7 @@ class TestSlurmExecutor:
         mock_client.cancel_job.assert_called_once_with(12345)
         assert len(executor.running) == 0
 
-    @patch("airflow_slurm_executor.slurm_executor.SlurmAPIClient")
+    @patch("airflow_provider_slurm.slurm_executor.SlurmAPIClient")
     def test_try_adopt_task_instances(self, mock_api_client, executor):
         """Test task adoption after scheduler restart."""
         # Create task instances to adopt

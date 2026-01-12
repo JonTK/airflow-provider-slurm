@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 sys.path.insert(0, "/home/jontk/src/github.com/jontk/airflow-slurm-executor")
 
-from airflow_slurm_executor.slurm_api_client import SlurmAPIClient
+from airflow_provider_slurm.slurm_api_client import SlurmAPIClient
 
 BASE_URL = "http://rocky9.ar.jontk.com:6820"
 TEST_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjY2Nzg5NjEsImlhdCI6MTc2NjY3NzE2MSwic3VuIjoicm9vdCJ9.FRcLY-j8uao80Obc51d7LgZd3Ql_Oan3H8anIVCjuAg"

@@ -9,9 +9,9 @@ from unittest.mock import MagicMock
 # Add the package to Python path
 sys.path.insert(0, "/home/jontk/src/github.com/jontk/airflow-slurm-executor")
 
-from airflow_slurm_executor.slurm_api_client import SlurmAPIClient
-from airflow_slurm_executor.slurm_token_manager import SlurmTokenManager
-from airflow_slurm_executor.exceptions import SlurmAPIError
+from airflow_provider_slurm.slurm_api_client import SlurmAPIClient
+from airflow_provider_slurm.slurm_token_manager import SlurmTokenManager
+from airflow_provider_slurm.exceptions import SlurmAPIError
 
 
 def test_live_server():

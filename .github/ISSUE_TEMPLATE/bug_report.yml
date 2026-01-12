@@ -148,7 +148,7 @@ body:
       placeholder: |
         ```ini
         [core]
-        executor = airflow_slurm_executor.SlurmExecutor
+        executor = airflow_provider_slurm.SlurmExecutor
 
         [slurm]
         api_url = https://cluster.example.com:6820

@@ -48,7 +48,7 @@ pip install airflow-provider-slurm
 ```ini
 # airflow.cfg
 [core]
-executor = airflow_slurm_executor.SlurmExecutor
+executor = airflow_provider_slurm.SlurmExecutor
 
 [slurm]
 api_url = https://your-slurm-cluster:6820

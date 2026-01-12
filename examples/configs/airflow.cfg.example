@@ -3,7 +3,7 @@
 
 [core]
 # Set the Slurm executor
-executor = airflow_slurm_executor.slurm_executor.SlurmExecutor
+executor = airflow_provider_slurm.slurm_executor.SlurmExecutor
 
 # Increase parallelism for Slurm workloads
 parallelism = 64

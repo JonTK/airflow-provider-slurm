@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, "/home/jontk/src/github.com/jontk/airflow-slurm-executor")
 
-from airflow_slurm_executor.slurm_executor import SlurmExecutor
+from airflow_provider_slurm.slurm_executor import SlurmExecutor
 
 
 def main():

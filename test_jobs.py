@@ -10,7 +10,7 @@ from datetime import datetime
 # Add the package to Python path
 sys.path.insert(0, "/home/jontk/src/github.com/jontk/airflow-slurm-executor")
 
-from airflow_slurm_executor.slurm_api_client import SlurmAPIClient
+from airflow_provider_slurm.slurm_api_client import SlurmAPIClient
 
 # Server configuration
 BASE_URL = "http://rocky9.ar.jontk.com:6820"

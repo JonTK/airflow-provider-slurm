@@ -7,9 +7,9 @@ import pytest
 import requests
 import responses
 
-from airflow_slurm_executor.exceptions import SlurmAPIError
-from airflow_slurm_executor.slurm_api_client import SlurmAPIClient
-from airflow_slurm_executor.slurm_token_manager import SlurmTokenManager
+from airflow_provider_slurm.exceptions import SlurmAPIError
+from airflow_provider_slurm.slurm_api_client import SlurmAPIClient
+from airflow_provider_slurm.slurm_token_manager import SlurmTokenManager
 
 
 class TestSlurmAPIClient:

@@ -2,7 +2,7 @@
 
 from setuptools import find_packages, setup
 
-from airflow_slurm_executor.version import __version__  # type: ignore[import]
+from airflow_provider_slurm.version import __version__  # type: ignore[import]
 
 # Read long description from README
 with open("README.md", "r", encoding="utf-8") as fh:
@@ -54,7 +54,7 @@ setup(
     },
     entry_points={
         "airflow.executors": [
-            "slurm = airflow_slurm_executor.slurm_executor:SlurmExecutor",
+            "slurm = airflow_provider_slurm.slurm_executor:SlurmExecutor",
         ],
     },
 )

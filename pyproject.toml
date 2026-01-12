@@ -33,7 +33,7 @@ Repository = "https://github.com/JonTK/airflow-provider-slurm.git"
 Issues = "https://github.com/JonTK/airflow-provider-slurm/issues"
 
 [tool.setuptools.dynamic]
-version = {attr = "airflow_slurm_executor.version.__version__"}
+version = {attr = "airflow_provider_slurm.version.__version__"}
 
 [tool.black]
 line-length = 88
@@ -60,7 +60,7 @@ include_trailing_comma = true
 force_grid_wrap = 0
 use_parentheses = true
 line_length = 88
-known_first_party = ["airflow_slurm_executor"]
+known_first_party = ["airflow_provider_slurm"]
 known_third_party = ["airflow", "requests", "pytest"]
 
 [tool.mypy]
@@ -89,7 +89,7 @@ addopts = [
 
 [tool.coverage.run]
 branch = true
-source = ["airflow_slurm_executor"]
+source = ["airflow_provider_slurm"]
 
 [tool.coverage.report]
 exclude_lines = [

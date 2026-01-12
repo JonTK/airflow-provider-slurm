@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from airflow_slurm_executor import SlurmExecutor
+from airflow_provider_slurm import SlurmExecutor
 
 
 class TestSlurmExecutorIntegration:
@@ -20,7 +20,7 @@ class TestSlurmExecutorIntegration:
         # This is a placeholder for real integration tests
         # In a real environment, this would connect to a test Slurm cluster
 
-        with patch("airflow_slurm_executor.slurm_executor.conf") as mock_conf:
+        with patch("airflow_provider_slurm.slurm_executor.conf") as mock_conf:
             # Mock configuration
             mock_conf.get.side_effect = lambda section, key, fallback=None: {
                 ("slurm", "api_url"): "https://test-slurm:6820",
@@ -34,9 +34,9 @@ class TestSlurmExecutorIntegration:
 
             # Mock components
             with patch(
-                "airflow_slurm_executor.slurm_executor.SlurmTokenManager"
+                "airflow_provider_slurm.slurm_executor.SlurmTokenManager"
             ), patch(
-                "airflow_slurm_executor.slurm_executor.SlurmAPIClient"
+                "airflow_provider_slurm.slurm_executor.SlurmAPIClient"
             ) as mock_client_class, patch(
                 "pathlib.Path.touch"
             ), patch(
@@ -76,7 +76,7 @@ class TestSlurmExecutorIntegration:
     @pytest.mark.integration
     def test_error_handling(self):
         """Test error handling scenarios with mocked failures."""
-        with patch("airflow_slurm_executor.slurm_executor.conf") as mock_conf:
+        with patch("airflow_provider_slurm.slurm_executor.conf") as mock_conf:
             # Mock configuration
             mock_conf.get.side_effect = lambda section, key, fallback=None: {
                 ("slurm", "api_url"): "https://unreachable-slurm:6820",
@@ -86,9 +86,9 @@ class TestSlurmExecutorIntegration:
             mock_conf.getfloat.return_value = 10.0
 
             with patch(
-                "airflow_slurm_executor.slurm_executor.SlurmTokenManager"
+                "airflow_provider_slurm.slurm_executor.SlurmTokenManager"
             ), patch(
-                "airflow_slurm_executor.slurm_executor.SlurmAPIClient"
+                "airflow_provider_slurm.slurm_executor.SlurmAPIClient"
             ) as mock_client_class:
                 # Setup mock client that fails ping
                 mock_client = MagicMock()
@@ -107,7 +107,7 @@ class TestSlurmExecutorIntegration:
         # This would test performance characteristics
         # Currently a placeholder with basic mock testing
 
-        with patch("airflow_slurm_executor.slurm_executor.conf") as mock_conf:
+        with patch("airflow_provider_slurm.slurm_executor.conf") as mock_conf:
             # Standard mock setup
             mock_conf.get.return_value = "test"
             mock_conf.getint.return_value = 10
@@ -115,9 +115,9 @@ class TestSlurmExecutorIntegration:
 
             # Mock successful operations
             with patch(
-                "airflow_slurm_executor.slurm_executor.SlurmTokenManager"
+                "airflow_provider_slurm.slurm_executor.SlurmTokenManager"
             ), patch(
-                "airflow_slurm_executor.slurm_executor.SlurmAPIClient"
+                "airflow_provider_slurm.slurm_executor.SlurmAPIClient"
             ) as mock_client_class, patch(
                 "pathlib.Path.touch"
             ), patch(

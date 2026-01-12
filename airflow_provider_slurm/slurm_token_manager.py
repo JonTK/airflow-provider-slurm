@@ -6,7 +6,7 @@ import subprocess
 from datetime import datetime, timedelta
 from typing import Optional
 
-from airflow_slurm_executor.exceptions import SlurmTokenError
+from airflow_provider_slurm.exceptions import SlurmTokenError
 
 logger = logging.getLogger(__name__)
 
