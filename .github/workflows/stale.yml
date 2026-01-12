@@ -1,0 +1,67 @@
+name: "Stale Issues and PRs"
+
+on:
+  schedule:
+    # Run daily at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/stale@v9
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+        # Issues
+        days-before-issue-stale: 60
+        days-before-issue-close: 14
+        stale-issue-label: 'stale'
+        exempt-issue-labels: 'pinned,security,good first issue,help wanted,bug'
+        stale-issue-message: |
+          This issue has been automatically marked as stale because it has not had
+          recent activity. It will be closed in 14 days if no further activity occurs.
+
+          If this issue is still relevant, please:
+          - Comment to keep it open
+          - Add the 'pinned' label to prevent auto-closing
+          - Provide any updates or additional context
+
+          Thank you for your contributions!
+        close-issue-message: |
+          This issue has been automatically closed due to inactivity.
+
+          If you believe this issue should remain open, please reopen it with updated
+          information or context. We appreciate your understanding!
+
+        # Pull Requests
+        days-before-pr-stale: 30
+        days-before-pr-close: 14
+        stale-pr-label: 'stale'
+        exempt-pr-labels: 'pinned,security,work in progress'
+        exempt-draft-pr: true
+        stale-pr-message: |
+          This pull request has been automatically marked as stale because it has not had
+          recent activity. It will be closed in 14 days if no further activity occurs.
+
+          If you're still working on this PR, please:
+          - Push new commits or comment to keep it open
+          - Mark as draft if it's work in progress
+          - Request a review if it's ready
+
+          Thank you for your contribution!
+        close-pr-message: |
+          This pull request has been automatically closed due to inactivity.
+
+          If you'd like to continue this work, please reopen the PR or create a new one.
+          We appreciate your contribution!
+
+        # Operations
+        operations-per-run: 30
+        remove-stale-when-updated: true
+        ascending: true

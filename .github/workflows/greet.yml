@@ -1,0 +1,46 @@
+name: "Greet Contributors"
+
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  greeting:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Greet first-time contributors
+      uses: actions/first-interaction@v1
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        issue-message: |
+          👋 Thanks for opening your first issue in the Airflow Provider Slurm project!
+
+          We appreciate you taking the time to contribute. A maintainer will review your issue soon.
+
+          In the meantime, please make sure you've provided all the necessary information and check out our [Contributing Guide](https://github.com/JonTK/airflow-provider-slurm/blob/main/CONTRIBUTING.md).
+
+          If you're looking to contribute code, feel free to check out [good first issues](https://github.com/JonTK/airflow-provider-slurm/labels/good%20first%20issue)!
+        pr-message: |
+          🎉 Thanks for opening your first pull request in the Airflow Provider Slurm project!
+
+          We're excited to have you as a contributor! Here's what happens next:
+
+          1. Our CI/CD pipeline will run automated tests on your PR
+          2. A maintainer will review your changes
+          3. We may request changes or ask questions
+
+          Please make sure:
+          - [ ] All tests pass
+          - [ ] Code follows our style guidelines (Black, isort, flake8)
+          - [ ] You've updated documentation if needed
+          - [ ] You've added tests for new functionality
+
+          Check out our [Contributing Guide](https://github.com/JonTK/airflow-provider-slurm/blob/main/CONTRIBUTING.md) for more details.
+
+          Thank you for contributing to HPC + Airflow integration! 🚀
