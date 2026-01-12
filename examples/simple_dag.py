@@ -34,33 +34,35 @@ with DAG(
         """Simple hello world task."""
         import time
         import socket
-        
+
         print(f"Hello from Slurm! Running on node: {socket.gethostname()}")
         print("This task is executing on a Slurm compute node")
-        
+
         # Simulate some work
         time.sleep(5)
-        
+
         return "Task completed successfully!"
 
-    @task(executor_config={
-        "cpus_per_task": 2,
-        "mem": "4G",
-        "time_limit": "00:10:00",
-        "partition": "compute",
-    })
+    @task(
+        executor_config={
+            "cpus_per_task": 2,
+            "mem": "4G",
+            "time_limit": "00:10:00",
+            "partition": "compute",
+        }
+    )
     def cpu_intensive_task():
         """Task with custom resource requirements."""
         import time
         import os
-        
+
         print(f"Running CPU intensive task with {os.cpu_count()} CPUs")
         print("Allocated 2 CPUs and 4GB memory via executor_config")
-        
+
         # Simulate CPU work
         result = sum(i * i for i in range(100000))
         time.sleep(10)
-        
+
         return f"Computation result: {result}"
 
     @task
@@ -68,11 +70,11 @@ with DAG(
         """Process results from previous tasks."""
         print(f"Hello task result: {hello_result}")
         print(f"CPU task result: {cpu_result}")
-        
+
         return "All tasks completed successfully!"
 
     # Define task dependencies
     hello_result = hello_slurm()
     cpu_result = cpu_intensive_task()
-    
+
     process_results(hello_result, cpu_result)

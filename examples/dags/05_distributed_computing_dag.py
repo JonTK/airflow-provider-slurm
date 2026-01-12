@@ -14,70 +14,72 @@ from airflow.utils.task_group import TaskGroup
 from airflow.utils.trigger_rule import TriggerRule
 
 default_args = {
-    'owner': 'distributed-computing-team',
-    'depends_on_past': False,
-    'start_date': datetime(2024, 1, 1),
-    'email_on_failure': True,
-    'retries': 1,
-    'retry_delay': timedelta(minutes=3),
+    "owner": "distributed-computing-team",
+    "depends_on_past": False,
+    "start_date": datetime(2024, 1, 1),
+    "email_on_failure": True,
+    "retries": 1,
+    "retry_delay": timedelta(minutes=3),
 }
 
 dag = DAG(
-    'distributed_computing_slurm',
+    "distributed_computing_slurm",
     default_args=default_args,
-    description='Advanced distributed computing with dynamic resource allocation',
-    schedule_interval='0 6 * * *',  # Daily at 6 AM
+    description="Advanced distributed computing with dynamic resource allocation",
+    schedule_interval="0 6 * * *",  # Daily at 6 AM
     catchup=False,
     max_active_runs=1,
-    tags=['slurm', 'distributed', 'dynamic', 'hpc']
+    tags=["slurm", "distributed", "dynamic", "hpc"],
 )
+
 
 def determine_workload_size(**context):
     """Determine the size of computational workload based on data or parameters."""
     import random
-    
+
     # Simulate workload determination (could be based on file size, data volume, etc.)
-    workload_types = ['small', 'medium', 'large']
+    workload_types = ["small", "medium", "large"]
     workload = random.choice(workload_types)
-    
+
     workload_configs = {
-        'small': {'partitions': 4, 'compute_time': '00:10:00', 'memory': '2G'},
-        'medium': {'partitions': 8, 'compute_time': '00:30:00', 'memory': '4G'},
-        'large': {'partitions': 16, 'compute_time': '01:00:00', 'memory': '8G'}
+        "small": {"partitions": 4, "compute_time": "00:10:00", "memory": "2G"},
+        "medium": {"partitions": 8, "compute_time": "00:30:00", "memory": "4G"},
+        "large": {"partitions": 16, "compute_time": "01:00:00", "memory": "8G"},
     }
-    
+
     config = workload_configs[workload]
-    config['workload_type'] = workload
-    
+    config["workload_type"] = workload
+
     print(f"Determined workload: {workload}")
     print(f"Configuration: {config}")
-    
+
     # Store configuration for downstream tasks
-    context['task_instance'].xcom_push(key='workload_config', value=config)
+    context["task_instance"].xcom_push(key="workload_config", value=config)
     return config
 
+
 # Start
-start = DummyOperator(task_id='start', dag=dag)
+start = DummyOperator(task_id="start", dag=dag)
 
 # Determine computational requirements
 analyze_workload = PythonOperator(
-    task_id='analyze_workload',
+    task_id="analyze_workload",
     python_callable=determine_workload_size,
     executor_config={
-        'slurm': {
-            'partition': 'normal',
-            'cpus_per_task': 1,
-            'mem': '256M',
-            'time_limit': '00:02:00',
+        "slurm": {
+            "partition": "normal",
+            "cpus_per_task": 1,
+            "mem": "256M",
+            "time_limit": "00:02:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Prepare distributed computing environment
 setup_environment = BashOperator(
-    task_id='setup_distributed_environment',
-    bash_command='''
+    task_id="setup_distributed_environment",
+    bash_command="""
     echo "=== Setting Up Distributed Computing Environment ==="
     
     WORK_DIR="/tmp/distributed_computing_{{ ds_nodash }}"
@@ -130,30 +132,30 @@ EOF
     echo "Environment setup completed"
     echo "Metadata:"
     cat "$WORK_DIR/metadata.json"
-    ''',
+    """,
     executor_config={
-        'slurm': {
-            'partition': 'normal',
-            'cpus_per_task': 2,
-            'mem': '1G',
-            'time_limit': '00:05:00',
+        "slurm": {
+            "partition": "normal",
+            "cpus_per_task": 2,
+            "mem": "1G",
+            "time_limit": "00:05:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Dynamic task generation using TaskGroup for parallel processing
 with TaskGroup("parallel_processing", dag=dag) as parallel_processing:
-    
+
     # We'll create tasks for different processing types
     # In a real scenario, you might dynamically generate these based on workload
-    
+
     # CPU-intensive tasks (normal partition)
     cpu_intensive_tasks = []
     for i in range(4):  # Process first 4 partitions on CPU
         task = BashOperator(
-            task_id=f'cpu_process_partition_{i+1}',
-            bash_command=f'''
+            task_id=f"cpu_process_partition_{i+1}",
+            bash_command=f"""
             echo "=== CPU Processing Partition {i+1} ==="
             
             WORK_DIR="/tmp/distributed_computing_{{{{ ds_nodash }}}}"
@@ -197,25 +199,29 @@ with TaskGroup("parallel_processing", dag=dag) as parallel_processing:
             echo "CPU processing completed for partition {i+1}"
             echo "Output: $OUTPUT_FILE"
             echo "Log: $LOG_FILE"
-            ''',
-            executor_config={{
-                'slurm': {{
-                    'partition': 'normal',
-                    'cpus_per_task': 4,  # More CPU cores for intensive work
-                    'mem': '{{{{ ti.xcom_pull(task_ids="analyze_workload", key="workload_config")["memory"] }}}}',
-                    'time_limit': '{{{{ ti.xcom_pull(task_ids="analyze_workload", key="workload_config")["compute_time"] }}}}',
-                }}
-            }},
-            dag=dag
+            """,
+            executor_config={
+                {
+                    "slurm": {
+                        {
+                            "partition": "normal",
+                            "cpus_per_task": 4,  # More CPU cores for intensive work
+                            "mem": '{{{{ ti.xcom_pull(task_ids="analyze_workload", key="workload_config")["memory"] }}}}',
+                            "time_limit": '{{{{ ti.xcom_pull(task_ids="analyze_workload", key="workload_config")["compute_time"] }}}}',
+                        }
+                    }
+                }
+            },
+            dag=dag,
         )
         cpu_intensive_tasks.append(task)
-    
-    # Memory-intensive tasks 
+
+    # Memory-intensive tasks
     memory_intensive_tasks = []
     for i in range(4, 8):  # Process partitions 5-8 with memory focus
         task = BashOperator(
-            task_id=f'memory_process_partition_{i+1}',
-            bash_command=f'''
+            task_id=f"memory_process_partition_{i+1}",
+            bash_command=f"""
             echo "=== Memory-Intensive Processing Partition {i+1} ==="
             
             WORK_DIR="/tmp/distributed_computing_{{{{ ds_nodash }}}}"
@@ -268,25 +274,29 @@ with TaskGroup("parallel_processing", dag=dag) as parallel_processing:
             }} > "$OUTPUT_FILE" 2>> "$LOG_FILE"
             
             echo "Memory processing completed for partition {i+1}"
-            ''',
-            executor_config={{
-                'slurm': {{
-                    'partition': 'normal',
-                    'cpus_per_task': 2,
-                    'mem': '16G',  # High memory requirement
-                    'time_limit': '{{{{ ti.xcom_pull(task_ids="analyze_workload", key="workload_config")["compute_time"] }}}}',
-                }}
-            }},
-            dag=dag
+            """,
+            executor_config={
+                {
+                    "slurm": {
+                        {
+                            "partition": "normal",
+                            "cpus_per_task": 2,
+                            "mem": "16G",  # High memory requirement
+                            "time_limit": '{{{{ ti.xcom_pull(task_ids="analyze_workload", key="workload_config")["compute_time"] }}}}',
+                        }
+                    }
+                }
+            },
+            dag=dag,
         )
         memory_intensive_tasks.append(task)
-    
+
     # Long-running tasks (using long partition if available)
     long_running_tasks = []
     for i in range(8, 10):  # Process remaining partitions as long jobs
         task = BashOperator(
-            task_id=f'long_process_partition_{i+1}',
-            bash_command=f'''
+            task_id=f"long_process_partition_{i+1}",
+            bash_command=f"""
             echo "=== Long-Running Processing Partition {i+1} ==="
             
             WORK_DIR="/tmp/distributed_computing_{{{{ ds_nodash }}}}"
@@ -339,23 +349,27 @@ with TaskGroup("parallel_processing", dag=dag) as parallel_processing:
             }} > "$OUTPUT_FILE" 2>> "$LOG_FILE"
             
             echo "Long-running processing completed for partition {i+1}"
-            ''',
-            executor_config={{
-                'slurm': {{
-                    'partition': 'long',  # Use long partition for extended jobs
-                    'cpus_per_task': 2,
-                    'mem': '4G',
-                    'time_limit': '02:00:00',  # Longer time limit
-                }}
-            }},
-            dag=dag
+            """,
+            executor_config={
+                {
+                    "slurm": {
+                        {
+                            "partition": "long",  # Use long partition for extended jobs
+                            "cpus_per_task": 2,
+                            "mem": "4G",
+                            "time_limit": "02:00:00",  # Longer time limit
+                        }
+                    }
+                }
+            },
+            dag=dag,
         )
         long_running_tasks.append(task)
 
 # Aggregation and analysis
 aggregate_results = BashOperator(
-    task_id='aggregate_distributed_results',
-    bash_command='''
+    task_id="aggregate_distributed_results",
+    bash_command="""
     echo "=== Aggregating Distributed Results ==="
     
     WORK_DIR="/tmp/distributed_computing_{{ ds_nodash }}"
@@ -483,22 +497,22 @@ aggregate_results = BashOperator(
     echo ""
     echo "=== FINAL REPORT ==="
     cat "$FINAL_REPORT"
-    ''',
+    """,
     executor_config={
-        'slurm': {
-            'partition': 'normal',
-            'cpus_per_task': 2,
-            'mem': '2G',
-            'time_limit': '00:10:00',
+        "slurm": {
+            "partition": "normal",
+            "cpus_per_task": 2,
+            "mem": "2G",
+            "time_limit": "00:10:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Performance analysis
 performance_analysis = BashOperator(
-    task_id='analyze_performance',
-    bash_command='''
+    task_id="analyze_performance",
+    bash_command="""
     echo "=== Performance Analysis ==="
     
     WORK_DIR="/tmp/distributed_computing_{{ ds_nodash }}"
@@ -624,14 +638,14 @@ EOF
     echo "  Total CPU cores used: $TOTAL_CPU_CORES"
     echo "  Total memory used: ${TOTAL_MEMORY_GB}GB"
     echo "  Parallel tasks executed: $(ls "$WORK_DIR/output/"*.out 2>/dev/null | wc -l)"
-    ''',
-    dag=dag
+    """,
+    dag=dag,
 )
 
 # Cleanup with resource reporting
 cleanup = BashOperator(
-    task_id='cleanup_and_report',
-    bash_command='''
+    task_id="cleanup_and_report",
+    bash_command="""
     echo "=== Cleanup and Final Resource Report ==="
     
     WORK_DIR="/tmp/distributed_computing_{{ ds_nodash }}"
@@ -666,16 +680,14 @@ cleanup = BashOperator(
     
     echo ""
     echo "✓ Distributed computing pipeline completed successfully"
-    ''',
+    """,
     trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
-    dag=dag
+    dag=dag,
 )
 
 # End
 end = DummyOperator(
-    task_id='end',
-    trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
-    dag=dag
+    task_id="end", trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS, dag=dag
 )
 
 # Define dependencies

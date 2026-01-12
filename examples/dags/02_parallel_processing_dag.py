@@ -12,53 +12,58 @@ from airflow.operators.python import PythonOperator
 from airflow.operators.dummy import DummyOperator
 
 default_args = {
-    'owner': 'data-engineering',
-    'depends_on_past': False,
-    'start_date': datetime(2024, 1, 1),
-    'email_on_failure': True,
-    'retries': 1,
-    'retry_delay': timedelta(minutes=2),
+    "owner": "data-engineering",
+    "depends_on_past": False,
+    "start_date": datetime(2024, 1, 1),
+    "email_on_failure": True,
+    "retries": 1,
+    "retry_delay": timedelta(minutes=2),
 }
 
 dag = DAG(
-    'parallel_processing_slurm',
+    "parallel_processing_slurm",
     default_args=default_args,
-    description='Parallel data processing using Slurm executor',
-    schedule_interval='0 2 * * *',  # Daily at 2 AM
+    description="Parallel data processing using Slurm executor",
+    schedule_interval="0 2 * * *",  # Daily at 2 AM
     catchup=False,
     max_active_runs=1,
-    tags=['slurm', 'parallel', 'data-processing']
+    tags=["slurm", "parallel", "data-processing"],
 )
+
 
 def generate_partitioned_data():
     """Generate partitioned data files for parallel processing."""
     import os
+
     base_dir = f"/tmp/parallel_processing_{{{{ ds_nodash }}}}"
     os.makedirs(base_dir, exist_ok=True)
-    
+
     for partition in range(4):
         file_path = f"{base_dir}/partition_{partition}.csv"
-        with open(file_path, 'w') as f:
+        with open(file_path, "w") as f:
             f.write("id,value,timestamp\\n")
             for i in range(1000):
-                f.write(f"{partition * 1000 + i},{i % 100},2024-01-01 {i % 24:02d}:00:00\\n")
+                f.write(
+                    f"{partition * 1000 + i},{i % 100},2024-01-01 {i % 24:02d}:00:00\\n"
+                )
         print(f"Created partition {partition} with 1000 records")
 
+
 # Start and data preparation
-start = DummyOperator(task_id='start', dag=dag)
+start = DummyOperator(task_id="start", dag=dag)
 
 prepare_data = PythonOperator(
-    task_id='prepare_data',
+    task_id="prepare_data",
     python_callable=generate_partitioned_data,
     executor_config={
-        'slurm': {
-            'partition': 'normal',
-            'cpus_per_task': 1,
-            'mem': '256M',
-            'time_limit': '00:02:00',
+        "slurm": {
+            "partition": "normal",
+            "cpus_per_task": 1,
+            "mem": "256M",
+            "time_limit": "00:02:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Parallel processing tasks - different resource requirements
@@ -68,8 +73,8 @@ for i in range(4):
     # CPU-intensive partition processing
     if i < 2:
         task = BashOperator(
-            task_id=f'process_partition_{i}_cpu',
-            bash_command=f'''
+            task_id=f"process_partition_{i}_cpu",
+            bash_command=f"""
             echo "=== Processing Partition {i} (CPU Intensive) ==="
             PARTITION_FILE="/tmp/parallel_processing_{{{{ ds_nodash }}}}/partition_{i}.csv"
             OUTPUT_FILE="/tmp/parallel_processing_{{{{ ds_nodash }}}}/processed_{i}.csv"
@@ -96,22 +101,26 @@ for i in range(4):
             
             echo "Completed processing partition {i}"
             echo "Output records: $(tail -n +2 $OUTPUT_FILE | wc -l)"
-            ''',
-            executor_config={{
-                'slurm': {{
-                    'partition': 'normal',
-                    'cpus_per_task': 2,  # More CPUs for intensive work
-                    'mem': '1G',
-                    'time_limit': '00:10:00',
-                }}
-            }},
-            dag=dag
+            """,
+            executor_config={
+                {
+                    "slurm": {
+                        {
+                            "partition": "normal",
+                            "cpus_per_task": 2,  # More CPUs for intensive work
+                            "mem": "1G",
+                            "time_limit": "00:10:00",
+                        }
+                    }
+                }
+            },
+            dag=dag,
         )
     else:
         # Memory-intensive partition processing
         task = BashOperator(
-            task_id=f'process_partition_{i}_memory',
-            bash_command=f'''
+            task_id=f"process_partition_{i}_memory",
+            bash_command=f"""
             echo "=== Processing Partition {i} (Memory Intensive) ==="
             PARTITION_FILE="/tmp/parallel_processing_{{{{ ds_nodash }}}}/partition_{i}.csv"
             OUTPUT_FILE="/tmp/parallel_processing_{{{{ ds_nodash }}}}/processed_{i}.csv"
@@ -135,24 +144,28 @@ for i in range(4):
             
             echo "Completed memory-intensive processing for partition {i}"
             echo "Output records: $(tail -n +2 $OUTPUT_FILE | wc -l)"
-            ''',
-            executor_config={{
-                'slurm': {{
-                    'partition': 'normal', 
-                    'cpus_per_task': 1,
-                    'mem': '2G',  # More memory for intensive work
-                    'time_limit': '00:15:00',
-                }}
-            }},
-            dag=dag
+            """,
+            executor_config={
+                {
+                    "slurm": {
+                        {
+                            "partition": "normal",
+                            "cpus_per_task": 1,
+                            "mem": "2G",  # More memory for intensive work
+                            "time_limit": "00:15:00",
+                        }
+                    }
+                }
+            },
+            dag=dag,
         )
-    
+
     process_partition_tasks.append(task)
 
 # Aggregation task that waits for all partitions
 aggregate_results = BashOperator(
-    task_id='aggregate_results',
-    bash_command='''
+    task_id="aggregate_results",
+    bash_command="""
     echo "=== Aggregating Results ==="
     BASE_DIR="/tmp/parallel_processing_{{ ds_nodash }}"
     FINAL_OUTPUT="$BASE_DIR/final_results.csv"
@@ -198,22 +211,22 @@ aggregate_results = BashOperator(
     } > $SUMMARY_FILE
     
     echo "Summary saved to: $SUMMARY_FILE"
-    ''',
+    """,
     executor_config={
-        'slurm': {
-            'partition': 'normal',
-            'cpus_per_task': 1,
-            'mem': '512M',
-            'time_limit': '00:05:00',
+        "slurm": {
+            "partition": "normal",
+            "cpus_per_task": 1,
+            "mem": "512M",
+            "time_limit": "00:05:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Quality check task
 quality_check = BashOperator(
-    task_id='quality_check',
-    bash_command='''
+    task_id="quality_check",
+    bash_command="""
     echo "=== Data Quality Check ==="
     BASE_DIR="/tmp/parallel_processing_{{ ds_nodash }}"
     FINAL_OUTPUT="$BASE_DIR/final_results.csv"
@@ -249,14 +262,14 @@ quality_check = BashOperator(
     fi
     
     echo "✓ All quality checks PASSED"
-    ''',
-    dag=dag
+    """,
+    dag=dag,
 )
 
 # Cleanup
 cleanup = BashOperator(
-    task_id='cleanup',
-    bash_command='''
+    task_id="cleanup",
+    bash_command="""
     echo "=== Cleanup ==="
     BASE_DIR="/tmp/parallel_processing_{{ ds_nodash }}"
     
@@ -271,11 +284,11 @@ cleanup = BashOperator(
     else
         echo "No cleanup needed - directory not found"
     fi
-    ''',
-    dag=dag
+    """,
+    dag=dag,
 )
 
-end = DummyOperator(task_id='end', dag=dag)
+end = DummyOperator(task_id="end", dag=dag)
 
 # Define dependencies
 start >> prepare_data

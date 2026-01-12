@@ -13,72 +13,74 @@ from airflow.operators.dummy import DummyOperator
 from airflow.utils.trigger_rule import TriggerRule
 
 default_args = {
-    'owner': 'bioinformatics-team',
-    'depends_on_past': False,
-    'start_date': datetime(2024, 1, 1),
-    'email_on_failure': True,
-    'retries': 1,
-    'retry_delay': timedelta(minutes=10),
+    "owner": "bioinformatics-team",
+    "depends_on_past": False,
+    "start_date": datetime(2024, 1, 1),
+    "email_on_failure": True,
+    "retries": 1,
+    "retry_delay": timedelta(minutes=10),
 }
 
 dag = DAG(
-    'bioinformatics_slurm_pipeline',
+    "bioinformatics_slurm_pipeline",
     default_args=default_args,
-    description='Bioinformatics analysis pipeline using Slurm executor',
-    schedule_interval='0 4 * * *',  # Daily at 4 AM
+    description="Bioinformatics analysis pipeline using Slurm executor",
+    schedule_interval="0 4 * * *",  # Daily at 4 AM
     catchup=False,
     max_active_runs=1,
-    tags=['slurm', 'bioinformatics', 'genomics', 'analysis']
+    tags=["slurm", "bioinformatics", "genomics", "analysis"],
 )
+
 
 def check_input_files():
     """Check if input sequencing files are available."""
     import os
     import random
-    
+
     # Simulate checking for new sequencing data
     sample_files = [
-        'sample_001_R1.fastq.gz',
-        'sample_001_R2.fastq.gz', 
-        'sample_002_R1.fastq.gz',
-        'sample_002_R2.fastq.gz'
+        "sample_001_R1.fastq.gz",
+        "sample_001_R2.fastq.gz",
+        "sample_002_R1.fastq.gz",
+        "sample_002_R2.fastq.gz",
     ]
-    
+
     # Simulate file availability (80% chance)
     files_available = random.random() > 0.2
-    
+
     if files_available:
         print(f"✓ Found {len(sample_files)} sequencing files to process")
-        return 'setup_workspace'
+        return "setup_workspace"
     else:
         print("✗ No new sequencing files found")
-        return 'no_files_to_process'
+        return "no_files_to_process"
+
 
 # Start
-start = DummyOperator(task_id='start', dag=dag)
+start = DummyOperator(task_id="start", dag=dag)
 
 # Check for input files
 check_files = BranchPythonOperator(
-    task_id='check_input_files',
+    task_id="check_input_files",
     python_callable=check_input_files,
     executor_config={
-        'slurm': {
-            'partition': 'normal',
-            'cpus_per_task': 1,
-            'mem': '256M',
-            'time_limit': '00:02:00',
+        "slurm": {
+            "partition": "normal",
+            "cpus_per_task": 1,
+            "mem": "256M",
+            "time_limit": "00:02:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Skip processing if no files
-no_files = DummyOperator(task_id='no_files_to_process', dag=dag)
+no_files = DummyOperator(task_id="no_files_to_process", dag=dag)
 
 # Setup workspace
 setup_workspace = BashOperator(
-    task_id='setup_workspace',
-    bash_command='''
+    task_id="setup_workspace",
+    bash_command="""
     echo "=== Setting up Bioinformatics Workspace ==="
     
     WORK_DIR="/tmp/bioinformatics_{{ ds_nodash }}"
@@ -119,24 +121,24 @@ setup_workspace = BashOperator(
     echo "Workspace setup completed"
     echo "Files created:"
     find "$WORK_DIR" -type f | head -10
-    ''',
+    """,
     executor_config={
-        'slurm': {
-            'partition': 'normal',
-            'cpus_per_task': 1,
-            'mem': '1G',
-            'time_limit': '00:05:00',
+        "slurm": {
+            "partition": "normal",
+            "cpus_per_task": 1,
+            "mem": "1G",
+            "time_limit": "00:05:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Quality control - parallel processing of samples
 qc_tasks = []
-for sample in ['001', '002']:
+for sample in ["001", "002"]:
     qc_task = BashOperator(
-        task_id=f'quality_control_sample_{sample}',
-        bash_command=f'''
+        task_id=f"quality_control_sample_{sample}",
+        bash_command=f"""
         echo "=== Quality Control for Sample {sample} ==="
         
         WORK_DIR="/tmp/bioinformatics_{{{{ ds_nodash }}}}"
@@ -188,25 +190,29 @@ for sample in ['001', '002']:
         }} > "$SUMMARY_FILE"
         
         echo "Quality control completed for sample {sample}"
-        ''',
-        executor_config={{
-            'slurm': {{
-                'partition': 'normal',
-                'cpus_per_task': 2,
-                'mem': '2G',
-                'time_limit': '00:15:00',
-            }}
-        }},
-        dag=dag
+        """,
+        executor_config={
+            {
+                "slurm": {
+                    {
+                        "partition": "normal",
+                        "cpus_per_task": 2,
+                        "mem": "2G",
+                        "time_limit": "00:15:00",
+                    }
+                }
+            }
+        },
+        dag=dag,
     )
     qc_tasks.append(qc_task)
 
 # Read alignment - memory intensive
 alignment_tasks = []
-for sample in ['001', '002']:
+for sample in ["001", "002"]:
     align_task = BashOperator(
-        task_id=f'align_sample_{sample}',
-        bash_command=f'''
+        task_id=f"align_sample_{sample}",
+        bash_command=f"""
         echo "=== Aligning Sample {sample} ==="
         
         WORK_DIR="/tmp/bioinformatics_{{{{ ds_nodash }}}}"
@@ -280,23 +286,27 @@ for sample in ['001', '002']:
         echo "Alignment completed for sample {sample}"
         echo "Output files:"
         ls -la "$ALIGN_DIR/sample_{sample}"*
-        ''',
-        executor_config={{
-            'slurm': {{
-                'partition': 'normal',
-                'cpus_per_task': 8,  # BWA benefits from multiple cores
-                'mem': '16G',        # Memory-intensive for large genomes
-                'time_limit': '02:00:00',  # Alignment can take time
-            }}
-        }},
-        dag=dag
+        """,
+        executor_config={
+            {
+                "slurm": {
+                    {
+                        "partition": "normal",
+                        "cpus_per_task": 8,  # BWA benefits from multiple cores
+                        "mem": "16G",  # Memory-intensive for large genomes
+                        "time_limit": "02:00:00",  # Alignment can take time
+                    }
+                }
+            }
+        },
+        dag=dag,
     )
     alignment_tasks.append(align_task)
 
 # Variant calling - CPU intensive
 variant_calling = BashOperator(
-    task_id='variant_calling',
-    bash_command='''
+    task_id="variant_calling",
+    bash_command="""
     echo "=== Variant Calling ==="
     
     WORK_DIR="/tmp/bioinformatics_{{ ds_nodash }}"
@@ -385,22 +395,22 @@ variant_calling = BashOperator(
     echo "  Raw variants: $VCF_FILE"
     echo "  Filtered variants: $FILTERED_VCF"
     echo "  Statistics: $STATS_FILE"
-    ''',
+    """,
     executor_config={
-        'slurm': {
-            'partition': 'normal',
-            'cpus_per_task': 4,
-            'mem': '8G',
-            'time_limit': '01:00:00',
+        "slurm": {
+            "partition": "normal",
+            "cpus_per_task": 4,
+            "mem": "8G",
+            "time_limit": "01:00:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Annotation - database intensive
 variant_annotation = BashOperator(
-    task_id='variant_annotation',
-    bash_command='''
+    task_id="variant_annotation",
+    bash_command="""
     echo "=== Variant Annotation ==="
     
     WORK_DIR="/tmp/bioinformatics_{{ ds_nodash }}"
@@ -462,22 +472,22 @@ variant_annotation = BashOperator(
     echo "Variant annotation completed"
     echo "Output: $ANNOTATED_VCF"
     echo "Summary: $ANNOTATION_SUMMARY"
-    ''',
+    """,
     executor_config={
-        'slurm': {
-            'partition': 'normal',
-            'cpus_per_task': 2,
-            'mem': '4G',
-            'time_limit': '00:30:00',
+        "slurm": {
+            "partition": "normal",
+            "cpus_per_task": 2,
+            "mem": "4G",
+            "time_limit": "00:30:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Generate final report
 generate_report = BashOperator(
-    task_id='generate_final_report',
-    bash_command='''
+    task_id="generate_final_report",
+    bash_command="""
     echo "=== Generating Final Analysis Report ==="
     
     WORK_DIR="/tmp/bioinformatics_{{ ds_nodash }}"
@@ -607,22 +617,22 @@ EOF
     echo "Variants identified: $(grep -v "^#" "$WORK_DIR/variants/annotated_variants.vcf" 2>/dev/null | wc -l || echo "0")"
     echo "Report: $FINAL_REPORT"
     echo "Workspace: $WORK_DIR"
-    ''',
+    """,
     executor_config={
-        'slurm': {
-            'partition': 'normal',
-            'cpus_per_task': 1,
-            'mem': '512M',
-            'time_limit': '00:10:00',
+        "slurm": {
+            "partition": "normal",
+            "cpus_per_task": 1,
+            "mem": "512M",
+            "time_limit": "00:10:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Archive results
 archive_results = BashOperator(
-    task_id='archive_results',
-    bash_command='''
+    task_id="archive_results",
+    bash_command="""
     echo "=== Archiving Results ==="
     
     WORK_DIR="/tmp/bioinformatics_{{ ds_nodash }}"
@@ -654,14 +664,14 @@ archive_results = BashOperator(
     echo "Archive created successfully"
     echo "Archive size: $(du -h "$ARCHIVE_FILE")"
     echo "Manifest: $MANIFEST_FILE"
-    ''',
-    dag=dag
+    """,
+    dag=dag,
 )
 
 # Cleanup
 cleanup = BashOperator(
-    task_id='cleanup',
-    bash_command='''
+    task_id="cleanup",
+    bash_command="""
     echo "=== Cleanup ==="
     
     WORK_DIR="/tmp/bioinformatics_{{ ds_nodash }}"
@@ -682,16 +692,14 @@ cleanup = BashOperator(
     else
         echo "No workspace to clean"
     fi
-    ''',
+    """,
     trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
-    dag=dag
+    dag=dag,
 )
 
 # End
 end = DummyOperator(
-    task_id='end',
-    trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
-    dag=dag
+    task_id="end", trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS, dag=dag
 )
 
 # Define dependencies
@@ -701,7 +709,13 @@ start >> check_files
 check_files >> setup_workspace
 setup_workspace >> qc_tasks
 qc_tasks >> alignment_tasks
-alignment_tasks >> variant_calling >> variant_annotation >> generate_report >> archive_results
+(
+    alignment_tasks
+    >> variant_calling
+    >> variant_annotation
+    >> generate_report
+    >> archive_results
+)
 
 # Skip path
 check_files >> no_files

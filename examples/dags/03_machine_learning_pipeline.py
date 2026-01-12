@@ -13,67 +13,66 @@ from airflow.operators.dummy import DummyOperator
 from airflow.utils.trigger_rule import TriggerRule
 
 default_args = {
-    'owner': 'ml-team',
-    'depends_on_past': False,
-    'start_date': datetime(2024, 1, 1),
-    'email_on_failure': True,
-    'retries': 2,
-    'retry_delay': timedelta(minutes=5),
+    "owner": "ml-team",
+    "depends_on_past": False,
+    "start_date": datetime(2024, 1, 1),
+    "email_on_failure": True,
+    "retries": 2,
+    "retry_delay": timedelta(minutes=5),
 }
 
 dag = DAG(
-    'ml_pipeline_slurm',
+    "ml_pipeline_slurm",
     default_args=default_args,
-    description='Complete ML pipeline using Slurm executor',
-    schedule_interval='0 3 * * 1',  # Weekly on Mondays at 3 AM
+    description="Complete ML pipeline using Slurm executor",
+    schedule_interval="0 3 * * 1",  # Weekly on Mondays at 3 AM
     catchup=False,
     max_active_runs=1,
-    tags=['slurm', 'machine-learning', 'gpu', 'training']
+    tags=["slurm", "machine-learning", "gpu", "training"],
 )
+
 
 def check_data_availability():
     """Check if new training data is available."""
     import os
     import random
-    
+
     # Simulate data availability check
     data_available = random.choice([True, True, False])  # 66% chance of data
-    
+
     if data_available:
         print("✓ New training data is available")
-        return 'prepare_training_data'
+        return "prepare_training_data"
     else:
         print("✗ No new training data available, skipping training")
-        return 'skip_training'
+        return "skip_training"
+
 
 # Start
-start = DummyOperator(task_id='start', dag=dag)
+start = DummyOperator(task_id="start", dag=dag)
 
 # Data availability check
 check_data = BranchPythonOperator(
-    task_id='check_data_availability',
+    task_id="check_data_availability",
     python_callable=check_data_availability,
     executor_config={
-        'slurm': {
-            'partition': 'normal',
-            'cpus_per_task': 1,
-            'mem': '256M',
-            'time_limit': '00:01:00',
+        "slurm": {
+            "partition": "normal",
+            "cpus_per_task": 1,
+            "mem": "256M",
+            "time_limit": "00:01:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Skip path for when no data is available
-skip_training = DummyOperator(
-    task_id='skip_training',
-    dag=dag
-)
+skip_training = DummyOperator(task_id="skip_training", dag=dag)
 
 # Data preparation - CPU intensive
 prepare_training_data = BashOperator(
-    task_id='prepare_training_data',
-    bash_command='''
+    task_id="prepare_training_data",
+    bash_command="""
     echo "=== Preparing Training Data ==="
     
     WORK_DIR="/tmp/ml_pipeline_{{ ds_nodash }}"
@@ -145,22 +144,22 @@ EOF
     echo "Data preparation completed successfully"
     echo "Files created:"
     ls -la "$WORK_DIR/data/"
-    ''',
+    """,
     executor_config={
-        'slurm': {
-            'partition': 'normal',
-            'cpus_per_task': 2,
-            'mem': '2G',
-            'time_limit': '00:10:00',
+        "slurm": {
+            "partition": "normal",
+            "cpus_per_task": 2,
+            "mem": "2G",
+            "time_limit": "00:10:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Feature engineering - CPU intensive
 feature_engineering = BashOperator(
-    task_id='feature_engineering',
-    bash_command='''
+    task_id="feature_engineering",
+    bash_command="""
     echo "=== Feature Engineering ==="
     
     WORK_DIR="/tmp/ml_pipeline_{{ ds_nodash }}"
@@ -237,22 +236,22 @@ joblib.dump(pca, f'{work_dir}/models/pca.pkl')
 
 print("Feature engineering completed!")
 EOF
-    ''',
+    """,
     executor_config={
-        'slurm': {
-            'partition': 'normal',
-            'cpus_per_task': 4,
-            'mem': '4G',
-            'time_limit': '00:15:00',
+        "slurm": {
+            "partition": "normal",
+            "cpus_per_task": 4,
+            "mem": "4G",
+            "time_limit": "00:15:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Model training - potentially GPU intensive
 train_models = BashOperator(
-    task_id='train_models',
-    bash_command='''
+    task_id="train_models",
+    bash_command="""
     echo "=== Training Models ==="
     
     WORK_DIR="/tmp/ml_pipeline_{{ ds_nodash }}"
@@ -336,21 +335,21 @@ with open(f'{work_dir}/models/best_model.txt', 'w') as f:
 
 print("Model training completed!")
 EOF
-    ''',
+    """,
     executor_config={
-        'slurm': {
-            'partition': 'normal',  # Could be 'gpu' if available
-            'cpus_per_task': 8,     # More CPUs for parallel training
-            'mem': '8G',
-            'time_limit': '00:30:00',
+        "slurm": {
+            "partition": "normal",  # Could be 'gpu' if available
+            "cpus_per_task": 8,  # More CPUs for parallel training
+            "mem": "8G",
+            "time_limit": "00:30:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Model evaluation
 evaluate_models = BashOperator(
-    task_id='evaluate_models',
+    task_id="evaluate_models",
     bash_command='''
     echo "=== Model Evaluation ==="
     
@@ -436,20 +435,20 @@ print("Model evaluation completed!")
 EOF
     ''',
     executor_config={
-        'slurm': {
-            'partition': 'normal',
-            'cpus_per_task': 2,
-            'mem': '2G',
-            'time_limit': '00:10:00',
+        "slurm": {
+            "partition": "normal",
+            "cpus_per_task": 2,
+            "mem": "2G",
+            "time_limit": "00:10:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Model deployment preparation
 prepare_deployment = BashOperator(
-    task_id='prepare_deployment',
-    bash_command='''
+    task_id="prepare_deployment",
+    bash_command="""
     echo "=== Preparing Model for Deployment ==="
     
     WORK_DIR="/tmp/ml_pipeline_{{ ds_nodash }}"
@@ -523,14 +522,14 @@ EOF
     ls -la "$DEPLOY_DIR"
     
     echo "Deployment ready at: $DEPLOY_DIR"
-    ''',
-    dag=dag
+    """,
+    dag=dag,
 )
 
 # Cleanup (with trigger rule to run regardless of upstream success)
 cleanup = BashOperator(
-    task_id='cleanup',
-    bash_command='''
+    task_id="cleanup",
+    bash_command="""
     echo "=== Cleanup ==="
     WORK_DIR="/tmp/ml_pipeline_{{ ds_nodash }}"
     
@@ -548,23 +547,28 @@ cleanup = BashOperator(
         echo "Remaining files:"
         find "$WORK_DIR" -type f | head -20
     fi
-    ''',
+    """,
     trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
-    dag=dag
+    dag=dag,
 )
 
 # End
 end = DummyOperator(
-    task_id='end',
-    trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
-    dag=dag
+    task_id="end", trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS, dag=dag
 )
 
 # Define dependencies
 start >> check_data
 
 # Main pipeline path
-check_data >> prepare_training_data >> feature_engineering >> train_models >> evaluate_models >> prepare_deployment
+(
+    check_data
+    >> prepare_training_data
+    >> feature_engineering
+    >> train_models
+    >> evaluate_models
+    >> prepare_deployment
+)
 
 # Skip path
 check_data >> skip_training

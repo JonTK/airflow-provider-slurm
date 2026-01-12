@@ -12,31 +12,32 @@ from airflow.operators.python import PythonOperator
 from airflow.operators.dummy import DummyOperator
 
 default_args = {
-    'owner': 'admin',
-    'depends_on_past': False,
-    'start_date': datetime(2024, 1, 1),
-    'email_on_failure': False,
-    'email_on_retry': False,
-    'retries': 1,
-    'retry_delay': timedelta(minutes=2),
+    "owner": "admin",
+    "depends_on_past": False,
+    "start_date": datetime(2024, 1, 1),
+    "email_on_failure": False,
+    "email_on_retry": False,
+    "retries": 1,
+    "retry_delay": timedelta(minutes=2),
 }
 
 dag = DAG(
-    'slurm_executor_test',
+    "slurm_executor_test",
     default_args=default_args,
-    description='Test DAG for Slurm executor functionality',
+    description="Test DAG for Slurm executor functionality",
     schedule_interval=None,  # Manual trigger only
     catchup=False,
     max_active_runs=1,
-    tags=['test', 'slurm', 'verification']
+    tags=["test", "slurm", "verification"],
 )
+
 
 def test_python_environment():
     """Test that Python environment is working correctly."""
     import sys
     import os
     import platform
-    
+
     print("=== Python Environment Test ===")
     print(f"Python version: {sys.version}")
     print(f"Python executable: {sys.executable}")
@@ -45,23 +46,21 @@ def test_python_environment():
     print(f"User: {os.getenv('USER', 'unknown')}")
     print(f"Home: {os.getenv('HOME', 'unknown')}")
     print(f"PATH: {os.getenv('PATH', 'unknown')[:200]}...")
-    
+
     # Test basic computation
-    result = sum(i*i for i in range(1000))
+    result = sum(i * i for i in range(1000))
     print(f"Computation test result: {result}")
-    
+
     print("✓ Python environment test completed successfully!")
 
+
 # Start marker
-start = DummyOperator(
-    task_id='start',
-    dag=dag
-)
+start = DummyOperator(task_id="start", dag=dag)
 
 # Test 1: Basic shell command
 test_shell = BashOperator(
-    task_id='test_shell_command',
-    bash_command='''
+    task_id="test_shell_command",
+    bash_command="""
     echo "=== Shell Command Test ==="
     echo "Hostname: $(hostname)"
     echo "Date: $(date)"
@@ -72,37 +71,37 @@ test_shell = BashOperator(
     echo "CPU info:"
     nproc || echo "nproc command not available"
     echo "✓ Shell command test completed successfully!"
-    ''',
+    """,
     executor_config={
-        'slurm': {
-            'partition': 'debug',  # Use debug partition for quick testing
-            'cpus_per_task': 1,
-            'mem': '256M',
-            'time_limit': '00:02:00',
+        "slurm": {
+            "partition": "debug",  # Use debug partition for quick testing
+            "cpus_per_task": 1,
+            "mem": "256M",
+            "time_limit": "00:02:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Test 2: Python environment
 test_python = PythonOperator(
-    task_id='test_python_environment', 
+    task_id="test_python_environment",
     python_callable=test_python_environment,
     executor_config={
-        'slurm': {
-            'partition': 'debug',
-            'cpus_per_task': 1,
-            'mem': '512M',
-            'time_limit': '00:02:00',
+        "slurm": {
+            "partition": "debug",
+            "cpus_per_task": 1,
+            "mem": "512M",
+            "time_limit": "00:02:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Test 3: File system operations
 test_filesystem = BashOperator(
-    task_id='test_filesystem_access',
-    bash_command='''
+    task_id="test_filesystem_access",
+    bash_command="""
     echo "=== Filesystem Test ==="
     
     # Test temp directory access
@@ -125,22 +124,22 @@ test_filesystem = BashOperator(
     echo "Cleanup completed"
     
     echo "✓ Filesystem test completed successfully!"
-    ''',
+    """,
     executor_config={
-        'slurm': {
-            'partition': 'debug',
-            'cpus_per_task': 1,
-            'mem': '256M', 
-            'time_limit': '00:02:00',
+        "slurm": {
+            "partition": "debug",
+            "cpus_per_task": 1,
+            "mem": "256M",
+            "time_limit": "00:02:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Test 4: Resource allocation
 test_resources = BashOperator(
-    task_id='test_resource_allocation',
-    bash_command='''
+    task_id="test_resource_allocation",
+    bash_command="""
     echo "=== Resource Allocation Test ==="
     
     echo "Slurm job environment variables:"
@@ -164,22 +163,22 @@ test_resources = BashOperator(
     echo "Node list: ${SLURM_JOB_NODELIST:-unknown}"
     
     echo "✓ Resource allocation test completed successfully!"
-    ''',
+    """,
     executor_config={
-        'slurm': {
-            'partition': 'normal',  # Use normal partition to test resource allocation
-            'cpus_per_task': 2,
-            'mem': '1G',
-            'time_limit': '00:03:00',
+        "slurm": {
+            "partition": "normal",  # Use normal partition to test resource allocation
+            "cpus_per_task": 2,
+            "mem": "1G",
+            "time_limit": "00:03:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Test 5: Network connectivity (if applicable)
 test_network = BashOperator(
-    task_id='test_network_connectivity',
-    bash_command='''
+    task_id="test_network_connectivity",
+    bash_command="""
     echo "=== Network Connectivity Test ==="
     
     echo "Testing basic network connectivity..."
@@ -202,22 +201,22 @@ test_network = BashOperator(
     fi
     
     echo "✓ Network connectivity test completed!"
-    ''',
+    """,
     executor_config={
-        'slurm': {
-            'partition': 'debug',
-            'cpus_per_task': 1,
-            'mem': '256M',
-            'time_limit': '00:03:00',
+        "slurm": {
+            "partition": "debug",
+            "cpus_per_task": 1,
+            "mem": "256M",
+            "time_limit": "00:03:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Success marker
 success = BashOperator(
-    task_id='test_success',
-    bash_command='''
+    task_id="test_success",
+    bash_command="""
     echo "========================================="
     echo "🎉 All Slurm Executor Tests PASSED! 🎉"
     echo "========================================="
@@ -232,24 +231,26 @@ success = BashOperator(
     echo ""
     echo "Timestamp: $(date)"
     echo "Node: $(hostname)"
-    ''',
-    trigger_rule='all_success',
+    """,
+    trigger_rule="all_success",
     executor_config={
-        'slurm': {
-            'partition': 'debug',
-            'cpus_per_task': 1,
-            'mem': '128M',
-            'time_limit': '00:01:00',
+        "slurm": {
+            "partition": "debug",
+            "cpus_per_task": 1,
+            "mem": "128M",
+            "time_limit": "00:01:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # End marker
-end = DummyOperator(
-    task_id='end',
-    dag=dag
-)
+end = DummyOperator(task_id="end", dag=dag)
 
 # Define dependencies
-start >> [test_shell, test_python, test_filesystem, test_resources, test_network] >> success >> end
+(
+    start
+    >> [test_shell, test_python, test_filesystem, test_resources, test_network]
+    >> success
+    >> end
+)

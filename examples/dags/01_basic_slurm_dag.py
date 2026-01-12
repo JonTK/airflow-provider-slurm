@@ -12,46 +12,43 @@ from airflow.operators.dummy import DummyOperator
 
 # DAG configuration
 default_args = {
-    'owner': 'data-engineering',
-    'depends_on_past': False,
-    'start_date': datetime(2024, 1, 1),
-    'email_on_failure': True,
-    'email_on_retry': False,
-    'retries': 2,
-    'retry_delay': timedelta(minutes=5),
+    "owner": "data-engineering",
+    "depends_on_past": False,
+    "start_date": datetime(2024, 1, 1),
+    "email_on_failure": True,
+    "email_on_retry": False,
+    "retries": 2,
+    "retry_delay": timedelta(minutes=5),
     # Slurm-specific configurations
-    'queue': 'normal',  # Slurm partition
-    'executor_config': {
-        'slurm': {
-            'partition': 'normal',
-            'cpus_per_task': 1,
-            'mem': '1G',
-            'time_limit': '00:10:00',
-            'account': 'research',
+    "queue": "normal",  # Slurm partition
+    "executor_config": {
+        "slurm": {
+            "partition": "normal",
+            "cpus_per_task": 1,
+            "mem": "1G",
+            "time_limit": "00:10:00",
+            "account": "research",
         }
-    }
+    },
 }
 
 dag = DAG(
-    'basic_slurm_example',
+    "basic_slurm_example",
     default_args=default_args,
-    description='Basic example of using Slurm executor',
-    schedule_interval='@daily',
+    description="Basic example of using Slurm executor",
+    schedule_interval="@daily",
     catchup=False,
     max_active_runs=1,
-    tags=['slurm', 'basic', 'example']
+    tags=["slurm", "basic", "example"],
 )
 
 # Start marker
-start = DummyOperator(
-    task_id='start',
-    dag=dag
-)
+start = DummyOperator(task_id="start", dag=dag)
 
 # Basic system information task
 system_info = BashOperator(
-    task_id='get_system_info',
-    bash_command='''
+    task_id="get_system_info",
+    bash_command="""
     echo "=== System Information ==="
     echo "Node: $(hostname)"
     echo "Date: $(date)"
@@ -62,14 +59,14 @@ system_info = BashOperator(
     free -h
     echo "Disk space:"
     df -h /tmp
-    ''',
-    dag=dag
+    """,
+    dag=dag,
 )
 
 # Simple data processing task
 process_data = BashOperator(
-    task_id='process_sample_data',
-    bash_command='''
+    task_id="process_sample_data",
+    bash_command="""
     echo "=== Processing Sample Data ==="
     
     # Create sample dataset
@@ -101,22 +98,22 @@ process_data = BashOperator(
     echo "Records processed: $(tail -n +2 $DATA_FILE | wc -l)" >> $SUMMARY_FILE
     
     echo "Summary saved to: $SUMMARY_FILE"
-    ''',
+    """,
     executor_config={
-        'slurm': {
-            'partition': 'normal',
-            'cpus_per_task': 1,
-            'mem': '512M',
-            'time_limit': '00:05:00',
+        "slurm": {
+            "partition": "normal",
+            "cpus_per_task": 1,
+            "mem": "512M",
+            "time_limit": "00:05:00",
         }
     },
-    dag=dag
+    dag=dag,
 )
 
 # Cleanup task
 cleanup = BashOperator(
-    task_id='cleanup_files',
-    bash_command='''
+    task_id="cleanup_files",
+    bash_command="""
     echo "=== Cleanup ==="
     echo "Removing temporary files for {{ ds }}"
     
@@ -129,15 +126,12 @@ cleanup = BashOperator(
     rm -f /tmp/data_summary_{{ ds_nodash }}.txt
     
     echo "Cleanup completed"
-    ''',
-    dag=dag
+    """,
+    dag=dag,
 )
 
 # End marker
-end = DummyOperator(
-    task_id='end',
-    dag=dag
-)
+end = DummyOperator(task_id="end", dag=dag)
 
 # Define task dependencies
 start >> system_info >> process_data >> cleanup >> end
