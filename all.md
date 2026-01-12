@@ -8,7 +8,7 @@ Airflow expects fairly tight integration with executors - you'll need to handle 
 Environment setup - ensuring the execution environment on compute nodes has access to Airflow's DAG files and dependencies
 Why this would be useful:
 
-Given your HPC background with systems like HPCFLOW, you'd recognize this fills a real gap - it would let data engineering teams leverage exis
+Given your HPC background with systems like HPCFLOW, you'd recognize this fills a real gap - it would let data engineering teams leverage existing
 Would it be possible to implement a Slurm executor in Airflow using the slurm rest api
 
 9 Dec
