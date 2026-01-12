@@ -164,7 +164,7 @@ Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Questions?
 
-- Open a [Discussion](https://github.com/JonTK/airflow-provider-slurm/discussions)
+- Open an [Issue](https://github.com/JonTK/airflow-provider-slurm/issues) for questions or help
 - Check existing issues and documentation
 
 ## License
