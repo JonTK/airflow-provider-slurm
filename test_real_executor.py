@@ -61,7 +61,6 @@ def main():
         with patch.object(SlurmTokenManager, "_fetch_new_token", mock_fetch_new_token):
             # Mock filesystem check
             with patch("pathlib.Path.touch"), patch("os.remove"), patch("os.makedirs"):
-
                 # Start executor
                 print("Starting executor...")
                 executor.start()
