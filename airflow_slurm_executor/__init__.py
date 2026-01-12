@@ -17,7 +17,7 @@ __all__ = [
     "__version__",
     "__author__",
     "SlurmExecutor",
-    "SlurmAPIClient", 
+    "SlurmAPIClient",
     "SlurmTokenManager",
     "SlurmExecutorException",
     "SlurmTokenError",

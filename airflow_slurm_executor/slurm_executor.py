@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 class SlurmExecutor(BaseExecutor):
     """Execute Airflow tasks on a Slurm cluster via REST API.
-    
+
     This executor submits tasks as Slurm jobs and monitors their status
     to update Airflow task states accordingly.
     """
@@ -37,11 +37,11 @@ class SlurmExecutor(BaseExecutor):
     def __init__(self) -> None:
         """Initialize the Slurm executor."""
         super().__init__()
-        
+
         # Component instances
         self.token_manager: Optional[SlurmTokenManager] = None
         self.slurm_client: Optional[SlurmAPIClient] = None
-        
+
         # Configuration
         self.api_url: str = ""
         self.username: Optional[str] = None
@@ -57,50 +57,50 @@ class SlurmExecutor(BaseExecutor):
         self.sync_interval: float = 10.0
         self.shutdown_mode: str = "cancel"
         self.shutdown_wait_timeout: int = 300
-        
+
         # State tracking
         self.last_sync_time: float = 0.0
         self.running: Dict[TaskInstanceKey, Dict[str, Any]] = {}
-        
+
         logger.info("Initialized SlurmExecutor")
 
     def start(self) -> None:
         """Start the executor and validate configuration."""
         logger.info("Starting SlurmExecutor")
-        
+
         # Load configuration
         self._load_config()
-        
+
         # Validate configuration
         if not self.api_url:
             raise SlurmConfigurationError(
                 "Slurm API URL not configured. "
                 "Set 'api_url' in [slurm] section of airflow.cfg"
             )
-        
+
         # Initialize components
         self.token_manager = SlurmTokenManager(
             username=self.username,
             lifespan=self.token_lifespan,
         )
-        
+
         self.slurm_client = SlurmAPIClient(
             base_url=self.api_url,
             token_manager=self.token_manager,
             timeout=conf.getint("slurm", "api_timeout", fallback=30),
             max_retries=conf.getint("slurm", "api_max_retries", fallback=3),
         )
-        
+
         # Test connection
         if not self.slurm_client.ping():
             raise SlurmConfigurationError(
                 f"Cannot connect to Slurm API at {self.api_url}. "
                 "Please check the URL and network connectivity."
             )
-        
+
         # Validate shared filesystem for logs
         self._validate_shared_filesystem()
-        
+
         logger.info(f"SlurmExecutor started successfully. API: {self.api_url}")
 
     def _load_config(self) -> None:
@@ -109,41 +109,49 @@ class SlurmExecutor(BaseExecutor):
         self.api_url = conf.get("slurm", "api_url", fallback="")
         self.username = conf.get("slurm", "username", fallback=None)
         self.token_lifespan = conf.getint("slurm", "token_lifespan", fallback=3600)
-        
+
         # Resource defaults
-        self.default_partition = conf.get("slurm", "default_partition", fallback="compute")
+        self.default_partition = conf.get(
+            "slurm", "default_partition", fallback="compute"
+        )
         self.default_cpus = conf.getint("slurm", "default_cpus", fallback=1)
         self.default_mem = conf.get("slurm", "default_mem", fallback="4G")
-        self.default_time_limit = conf.get("slurm", "default_time_limit", fallback="01:00:00")
+        self.default_time_limit = conf.get(
+            "slurm", "default_time_limit", fallback="01:00:00"
+        )
         self.default_account = conf.get("slurm", "default_account", fallback=None)
-        
+
         # Environment setup
         self.airflow_venv = conf.get("slurm", "airflow_venv", fallback=None)
         self.default_container = conf.get("slurm", "default_container", fallback=None)
-        
+
         # Executor behavior
         self.sync_interval = conf.getfloat("slurm", "sync_interval", fallback=10.0)
         self.shutdown_mode = conf.get("slurm", "shutdown_mode", fallback="cancel")
-        self.shutdown_wait_timeout = conf.getint("slurm", "shutdown_wait_timeout", fallback=300)
-        
-        logger.debug(f"Loaded configuration: api_url={self.api_url}, partition={self.default_partition}")
+        self.shutdown_wait_timeout = conf.getint(
+            "slurm", "shutdown_wait_timeout", fallback=300
+        )
+
+        logger.debug(
+            f"Loaded configuration: api_url={self.api_url}, partition={self.default_partition}"
+        )
 
     def _convert_time_to_seconds(self, time_value: Union[str, int]) -> int:
         """Convert time string or integer to seconds.
-        
+
         Args:
             time_value: Time as string (HH:MM:SS, MM:SS) or integer (seconds)
-            
+
         Returns:
             Time in seconds as integer
         """
         if isinstance(time_value, int):
             return time_value
-            
+
         if isinstance(time_value, str):
             # Handle formats like "01:00:00", "60:00", "3600"
-            if ':' in time_value:
-                parts = time_value.split(':')
+            if ":" in time_value:
+                parts = time_value.split(":")
                 if len(parts) == 3:  # HH:MM:SS
                     hours, minutes, seconds = map(int, parts)
                     return hours * 3600 + minutes * 60 + seconds
@@ -153,7 +161,7 @@ class SlurmExecutor(BaseExecutor):
             else:
                 # Assume it's already in seconds as string
                 return int(time_value)
-        
+
         # Fallback
         return 3600  # 1 hour default
 
@@ -161,7 +169,7 @@ class SlurmExecutor(BaseExecutor):
         """Verify log directory is accessible and writable."""
         log_folder = conf.get("logging", "base_log_folder")
         test_file = os.path.join(log_folder, ".slurm_executor_test")
-        
+
         try:
             Path(test_file).touch()
             os.remove(test_file)
@@ -171,7 +179,9 @@ class SlurmExecutor(BaseExecutor):
                 f"Cannot write to log folder {log_folder}: {e}. "
                 "Ensure this path is on shared storage accessible from compute nodes."
             )
-            raise SlurmConfigurationError(f"Log folder not writable: {log_folder}") from e
+            raise SlurmConfigurationError(
+                f"Log folder not writable: {log_folder}"
+            ) from e
 
     def execute_async(
         self,
@@ -181,7 +191,7 @@ class SlurmExecutor(BaseExecutor):
         executor_config: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Submit a task to Slurm as a job.
-        
+
         Args:
             key: Unique task instance identifier
             command: Command to execute
@@ -190,14 +200,14 @@ class SlurmExecutor(BaseExecutor):
         """
         try:
             logger.info(f"Submitting task {key} to Slurm")
-            
+
             # Build job specification
             job_spec = self._build_job_spec(key, command, queue, executor_config)
-            
+
             # Submit to Slurm
             result = self.slurm_client.submit_job(job_spec)
             job_id = result.get("job_id")
-            
+
             if job_id:
                 # Track the job
                 self.running[key] = {
@@ -208,7 +218,7 @@ class SlurmExecutor(BaseExecutor):
                 logger.info(f"Task {key} submitted as Slurm job {job_id}")
             else:
                 raise SlurmJobSubmissionError(f"No job_id returned for task {key}")
-                
+
         except Exception as e:
             logger.error(f"Failed to submit task {key}: {e}")
             self.fail(key)
@@ -221,27 +231,27 @@ class SlurmExecutor(BaseExecutor):
         executor_config: Optional[Dict[str, Any]],
     ) -> Dict[str, Any]:
         """Build Slurm job specification for a task.
-        
+
         Args:
             key: Task instance key
             command: Command to execute
             queue: Airflow queue name
             executor_config: Task-specific configuration
-            
+
         Returns:
             Job specification dictionary
         """
         config = executor_config or {}
-        
+
         # Build job name
         job_name = self._build_job_name(key)
-        
+
         # Determine log path
         log_path = self._get_log_path(key)
-        
+
         # Build script
         script = self._build_script(command)
-        
+
         # Build job parameters
         job_params = {
             "name": job_name,
@@ -249,25 +259,27 @@ class SlurmExecutor(BaseExecutor):
             "tasks": 1,  # Single task per job
             "cpus_per_task": config.get("cpus_per_task", self.default_cpus),
             "memory_per_node": config.get("mem", self.default_mem),
-            "time_limit": self._convert_time_to_seconds(config.get("time_limit", self.default_time_limit)),
+            "time_limit": self._convert_time_to_seconds(
+                config.get("time_limit", self.default_time_limit)
+            ),
             "current_working_directory": config.get("working_dir", self.airflow_home),
             "environment": self._build_environment(key),
             "standard_output": log_path,
             "standard_error": log_path,
         }
-        
+
         # Add optional parameters
         if self.default_account or config.get("account"):
             job_params["account"] = config.get("account", self.default_account)
-            
+
         if config.get("qos"):
             job_params["qos"] = config["qos"]
-            
+
         # Container support
         container = config.get("container", self.default_container)
         if container:
             job_params["container"] = container
-        
+
         return {
             "script": script,
             "job": job_params,
@@ -275,7 +287,7 @@ class SlurmExecutor(BaseExecutor):
 
     def _build_job_name(self, key: TaskInstanceKey) -> str:
         """Build Slurm job name that encodes task identity.
-        
+
         Format: airflow-{dag_id}-{task_id}-{run_id_hash}-{try_number}
         """
         # Get run_id (standard in Airflow 3.x, fallback for older versions)
@@ -284,16 +296,16 @@ class SlurmExecutor(BaseExecutor):
             # Fallback for older Airflow versions
             execution_date = getattr(key, "execution_date", None)
             run_id = str(execution_date) if execution_date else "unknown"
-        
+
         # Hash run_id for compactness
         run_id_hash = hashlib.sha256(run_id.encode()).hexdigest()[:8]
-        
+
         # Sanitize IDs
         dag_id = key.dag_id.replace("/", "_").replace(".", "_")
         task_id = key.task_id.replace("/", "_").replace(".", "_")
-        
+
         job_name = f"airflow-{dag_id}-{task_id}-{run_id_hash}-{key.try_number}"
-        
+
         # Slurm job name limit is typically 256 chars
         if len(job_name) > 256:
             # Truncate dag_id and task_id to fit
@@ -301,7 +313,7 @@ class SlurmExecutor(BaseExecutor):
             dag_id = dag_id[:max_id_length]
             task_id = task_id[:max_id_length]
             job_name = f"airflow-{dag_id}-{task_id}-{run_id_hash}-{key.try_number}"
-        
+
         return job_name
 
     def _build_script(self, command: List[str]) -> str:
@@ -311,27 +323,31 @@ class SlurmExecutor(BaseExecutor):
             "set -euo pipefail",
             "",
         ]
-        
+
         # Add virtual environment activation if configured
         if self.airflow_venv and not self.default_container:
-            lines.extend([
-                f"# Activate virtual environment",
-                f"source {self.airflow_venv}/bin/activate",
-                "",
-            ])
-        
+            lines.extend(
+                [
+                    f"# Activate virtual environment",
+                    f"source {self.airflow_venv}/bin/activate",
+                    "",
+                ]
+            )
+
         # Add the actual command
-        lines.extend([
-            "# Execute Airflow task",
-            " ".join(shlex.quote(arg) for arg in command),
-        ])
-        
+        lines.extend(
+            [
+                "# Execute Airflow task",
+                " ".join(shlex.quote(arg) for arg in command),
+            ]
+        )
+
         return "\n".join(lines)
 
     def _build_environment(self, key: TaskInstanceKey) -> Dict[str, str]:
         """Build environment variables for job."""
         env = os.environ.copy()
-        
+
         # Ensure critical system variables are set
         if "PATH" not in env:
             env["PATH"] = "/usr/local/bin:/usr/bin:/bin"
@@ -339,26 +355,28 @@ class SlurmExecutor(BaseExecutor):
             env["USER"] = os.environ.get("USER", "airflow")
         if "HOME" not in env:
             env["HOME"] = os.path.expanduser("~")
-        
+
         # Ensure critical Airflow variables are set
-        env.update({
-            "AIRFLOW_HOME": self.airflow_home,
-            "AIRFLOW__CORE__DAGS_FOLDER": conf.get("core", "dags_folder"),
-            "AIRFLOW__CORE__EXECUTOR": "LocalExecutor",  # Tasks run in local mode
-        })
-        
+        env.update(
+            {
+                "AIRFLOW_HOME": self.airflow_home,
+                "AIRFLOW__CORE__DAGS_FOLDER": conf.get("core", "dags_folder"),
+                "AIRFLOW__CORE__EXECUTOR": "LocalExecutor",  # Tasks run in local mode
+            }
+        )
+
         return env
 
     def _get_log_path(self, key: TaskInstanceKey) -> str:
         """Determine log file path for a task instance."""
         # Get base log folder
         base_log_folder = conf.get("logging", "base_log_folder")
-        
+
         # Build path components
         dag_id = key.dag_id
         task_id = key.task_id
         try_number = key.try_number
-        
+
         # Handle run_id (Airflow 3.x) or execution_date (older versions)
         if hasattr(key, "run_id"):
             # Use run_id for Airflow 3.x
@@ -366,8 +384,12 @@ class SlurmExecutor(BaseExecutor):
         else:
             # Fallback for older versions
             execution_date = getattr(key, "execution_date", None)
-            execution_date_str = execution_date.strftime("%Y-%m-%dT%H:%M:%S%z") if execution_date else "unknown"
-        
+            execution_date_str = (
+                execution_date.strftime("%Y-%m-%dT%H:%M:%S%z")
+                if execution_date
+                else "unknown"
+            )
+
         # Construct path
         log_path = os.path.join(
             base_log_folder,
@@ -375,12 +397,12 @@ class SlurmExecutor(BaseExecutor):
             dag_id,
             task_id,
             execution_date_str,
-            f"{try_number}.log"
+            f"{try_number}.log",
         )
-        
+
         # Ensure directory exists
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
-        
+
         return log_path
 
     def sync(self) -> None:
@@ -390,47 +412,47 @@ class SlurmExecutor(BaseExecutor):
         if now - self.last_sync_time < self.sync_interval:
             return
         self.last_sync_time = now
-        
+
         if not self.running:
             return
-        
+
         logger.debug(f"Syncing status for {len(self.running)} running tasks")
-        
+
         try:
             # Get all job IDs we're tracking
             job_ids = [info["slurm_job_id"] for info in self.running.values()]
-            
+
             # Query Slurm for job statuses
             result = self.slurm_client.get_jobs(job_ids=job_ids)
             jobs = result.get("jobs", [])
-            
+
             # Build lookup by job ID
             job_statuses = {job["job_id"]: job for job in jobs}
-            
+
             # Update state for each tracked task
             for key, job_info in list(self.running.items()):
                 slurm_job_id = job_info["slurm_job_id"]
-                
+
                 if slurm_job_id in job_statuses:
                     # Job found in active queue
                     self._handle_job_state(key, job_statuses[slurm_job_id])
                 else:
                     # Job not in active queue - check history or mark missing
                     self._handle_missing_job(key, job_info)
-                    
+
         except Exception as e:
             logger.error(f"Error during sync: {e}")
 
     def _handle_job_state(self, key: TaskInstanceKey, job_data: Dict[str, Any]) -> None:
         """Process Slurm job state and update Airflow task state."""
         state = job_data.get("job_state", "UNKNOWN")
-        
+
         logger.debug(f"Task {key} job {job_data['job_id']} in state {state}")
-        
+
         # States that don't require action
         if state in ["PENDING", "CONFIGURING", "RUNNING"]:
             return
-        
+
         # Job completed
         if state == "COMPLETED":
             exit_code = job_data.get("exit_code", 0)
@@ -442,40 +464,49 @@ class SlurmExecutor(BaseExecutor):
                 logger.error(f"Task {key} failed with exit code {exit_code}")
             del self.running[key]
             return
-        
+
         # Job failed
-        if state in ["FAILED", "TIMEOUT", "CANCELLED", "NODE_FAIL", "OUT_OF_MEMORY", "PREEMPTED"]:
+        if state in [
+            "FAILED",
+            "TIMEOUT",
+            "CANCELLED",
+            "NODE_FAIL",
+            "OUT_OF_MEMORY",
+            "PREEMPTED",
+        ]:
             reason = job_data.get("state_reason", "unknown")
             self.fail(key)
             logger.error(f"Task {key} failed: {state} - {reason}")
             del self.running[key]
             return
-        
+
         # Unknown state
         logger.warning(f"Unknown Slurm state '{state}' for task {key}")
 
-    def _handle_missing_job(self, key: TaskInstanceKey, job_info: Dict[str, Any]) -> None:
+    def _handle_missing_job(
+        self, key: TaskInstanceKey, job_info: Dict[str, Any]
+    ) -> None:
         """Handle job that's not in active queue."""
         slurm_job_id = job_info["slurm_job_id"]
-        
+
         # Try to get job from history
         try:
             job_history = self.slurm_client.get_job_history(slurm_job_id)
-            
+
             if job_history:
                 # Found in history - process final state
                 self._handle_job_state(key, job_history)
                 return
-                
+
         except SlurmAPIError as e:
             logger.debug(f"Could not query history for job {slurm_job_id}: {e}")
-        
+
         # Track how long it's been missing
         if "missing_since" not in job_info:
             job_info["missing_since"] = datetime.now()
             logger.debug(f"Job {slurm_job_id} not found in active queue, tracking")
             return
-        
+
         # Check timeout
         missing_duration = datetime.now() - job_info["missing_since"]
         if missing_duration > timedelta(minutes=5):
@@ -491,15 +522,17 @@ class SlurmExecutor(BaseExecutor):
         if not self.running:
             logger.info("SlurmExecutor shutdown: no running jobs")
             return
-        
+
         logger.info(f"SlurmExecutor shutdown: {len(self.running)} jobs running")
-        
+
         if self.shutdown_mode == "cancel":
             self._cancel_all_jobs()
         elif self.shutdown_mode == "wait":
             self._wait_for_jobs(timeout=self.shutdown_wait_timeout)
         else:
-            logger.warning(f"Unknown shutdown_mode: {self.shutdown_mode}, cancelling jobs")
+            logger.warning(
+                f"Unknown shutdown_mode: {self.shutdown_mode}, cancelling jobs"
+            )
             self._cancel_all_jobs()
 
     def _cancel_all_jobs(self) -> None:
@@ -511,19 +544,19 @@ class SlurmExecutor(BaseExecutor):
                 logger.info(f"Cancelled job {slurm_job_id} for task {key}")
             except SlurmAPIError as e:
                 logger.warning(f"Failed to cancel job {slurm_job_id}: {e}")
-            
+
             self.fail(key)
-        
+
         self.running.clear()
 
     def _wait_for_jobs(self, timeout: int) -> None:
         """Wait for jobs to complete, then cancel remaining."""
         start_time = time.time()
-        
+
         while self.running and (time.time() - start_time) < timeout:
             self.sync()
             time.sleep(5)
-        
+
         if self.running:
             logger.warning(
                 f"Timeout waiting for jobs after {timeout}s, "
@@ -534,37 +567,37 @@ class SlurmExecutor(BaseExecutor):
     def terminate(self) -> None:
         """Emergency shutdown - kill everything immediately."""
         logger.warning("SlurmExecutor emergency terminate: killing all jobs")
-        
+
         # Best-effort cancellation, ignore errors
         for key, job_info in self.running.items():
             try:
                 self.slurm_client.cancel_job(job_info["slurm_job_id"])
             except Exception:
                 pass  # Ignore all errors in emergency shutdown
-        
+
         self.running.clear()
 
     def try_adopt_task_instances(self, tis: List[TaskInstance]) -> List[TaskInstance]:
         """Adopt running tasks after scheduler restart.
-        
+
         Args:
             tis: List of task instances to potentially adopt
-            
+
         Returns:
             List of successfully adopted task instances
         """
         if not tis:
             return []
-        
+
         logger.info(f"Attempting to adopt {len(tis)} task instances")
-        
+
         adopted = []
-        
+
         try:
             # Query Slurm for all jobs
             response = self.slurm_client.get_jobs()
             jobs = response.get("jobs", [])
-            
+
             # Build lookup by job name
             slurm_jobs = {}
             for job in jobs:
@@ -574,19 +607,19 @@ class SlurmExecutor(BaseExecutor):
                         "job_id": job["job_id"],
                         "state": job.get("job_state", ""),
                     }
-            
+
             logger.info(f"Found {len(slurm_jobs)} Airflow jobs in Slurm queue")
-            
+
             # Try to match each TI to a Slurm job
             for ti in tis:
                 key = ti.key
                 expected_job_name = self._build_job_name(key)
-                
+
                 if expected_job_name in slurm_jobs:
                     job_info = slurm_jobs[expected_job_name]
                     job_id = job_info["job_id"]
                     state = job_info["state"]
-                    
+
                     # Only adopt if job is still active
                     if state in ["PENDING", "CONFIGURING", "RUNNING"]:
                         # Reconstruct tracking state
@@ -605,10 +638,10 @@ class SlurmExecutor(BaseExecutor):
                             f"Task {key.dag_id}.{key.task_id} job {job_id} "
                             f"already in terminal state {state}, not adopting"
                         )
-            
+
             logger.info(f"Successfully adopted {len(adopted)} of {len(tis)} tasks")
             return adopted
-            
+
         except SlurmAPIError as e:
             logger.error(f"Failed to query Slurm for task adoption: {e}")
             return []
