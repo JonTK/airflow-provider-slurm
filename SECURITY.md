@@ -105,7 +105,7 @@ This provider executes Airflow tasks on HPC clusters via Slurm. Please consider 
 ### Known Security Limitations
 
 1. **Alpha Status**: This is an alpha release and may contain undiscovered security issues
-2. **Slurm API Versions**: Only tested with slurmrestd v0.0.40-v0.0.44; other versions may have different security characteristics
+2. **Slurm API Versions**: Only tested with Slurm 23.11-25.11 (slurmrestd v0.0.40-v0.0.44); other versions may have different security characteristics
 3. **Job Recovery**: Job state recovery relies on Slurm job metadata; ensure proper access controls
 4. **Command Injection**: While we sanitize inputs, always validate user-provided configuration
 

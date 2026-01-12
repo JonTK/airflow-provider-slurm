@@ -31,7 +31,7 @@ Execute Apache Airflow tasks on High-Performance Computing (HPC) clusters using 
 
 - **Python**: 3.8, 3.9, 3.10, 3.11
 - **Apache Airflow**: 2.5.0+ (including 3.x support)
-- **Slurm**: 20.02+ with REST API (slurmrestd) v0.0.40-v0.0.44  
+- **Slurm**: 23.11+ (REST API v0.0.40) to 25.11+ (REST API v0.0.44)
 - **System**: `scontrol` binary available in PATH
 - **Storage**: Shared filesystem between Airflow and Slurm compute nodes
 

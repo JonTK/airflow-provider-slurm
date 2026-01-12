@@ -21,7 +21,7 @@ Initial alpha release of `airflow-provider-slurm`.
   - Job submission, querying, and cancellation
   - Retry logic with exponential backoff
   - Authentication header management
-  - Support for Slurm REST API v0.0.40-v0.0.44
+  - Support for Slurm 23.11-25.11 (REST API v0.0.40-v0.0.44)
 - **SlurmTokenManager**: JWT token management
   - Token generation via `scontrol` command
   - Token caching and automatic refresh
@@ -35,7 +35,7 @@ Initial alpha release of `airflow-provider-slurm`.
   - Distributed computing patterns
 
 ### Technical Details
-- **API Compatibility**: Slurm REST API v0.0.40-v0.0.44
+- **API Compatibility**: Slurm 23.11-25.11 (REST API v0.0.40-v0.0.44)
 - **Python Support**: 3.8, 3.9, 3.10, 3.11
 - **Airflow Support**: 2.5.0+ and 3.x
 - **Live Testing**: Jobs successfully completed on Slurm 25.11.1
