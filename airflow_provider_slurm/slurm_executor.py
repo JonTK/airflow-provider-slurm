@@ -185,7 +185,7 @@ class SlurmExecutor(BaseExecutor):
     def execute_async(
         self,
         key: TaskInstanceKey,
-        command: List[str],
+        command: Sequence[str],
         queue: Optional[str] = None,
         executor_config: Optional[Dict[str, Any]] = None,
     ) -> None:
@@ -226,7 +226,7 @@ class SlurmExecutor(BaseExecutor):
     def _build_job_spec(
         self,
         key: TaskInstanceKey,
-        command: List[str],
+        command: Sequence[str],
         queue: Optional[str],
         executor_config: Optional[Dict[str, Any]],
     ) -> Dict[str, Any]:
@@ -316,7 +316,7 @@ class SlurmExecutor(BaseExecutor):
 
         return job_name
 
-    def _build_script(self, command: List[str]) -> str:
+    def _build_script(self, command: Sequence[str]) -> str:
         """Build bash script for job execution."""
         lines = [
             "#!/bin/bash",
