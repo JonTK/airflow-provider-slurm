@@ -63,7 +63,6 @@ known_first_party = ["airflow_provider_slurm"]
 known_third_party = ["airflow", "requests", "pytest"]
 
 [tool.mypy]
-python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
