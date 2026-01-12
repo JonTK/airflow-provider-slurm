@@ -7,7 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2024-12-25
+## [0.1.0] - 2025-12-25
+
+Initial alpha release of `airflow-provider-slurm`.
+
+### Added
+- **SlurmExecutor**: Main executor class inheriting from Airflow's BaseExecutor
+  - Job submission via `execute_async()` method
+  - Status synchronization with `sync()` method
+  - Task adoption for scheduler restart recovery
+  - Graceful and emergency shutdown support
+- **SlurmAPIClient**: REST API communication layer
+  - Job submission, querying, and cancellation
+  - Retry logic with exponential backoff
+  - Authentication header management
+  - Support for Slurm REST API v0.0.40-v0.0.44
+- **SlurmTokenManager**: JWT token management
+  - Token generation via `scontrol` command
+  - Token caching and automatic refresh
+- **Live Cluster Validation**: Tested against Slurm 25.11.1 cluster
+- **Airflow 3.x Compatibility**: Fixed imports for Apache Airflow 3.x support
+- **Advanced DAG Examples**: 5 workflow examples
+  - Basic Slurm executor demonstration
+  - Parallel processing workflows
+  - Machine learning pipeline orchestration
+  - Bioinformatics workflow examples
+  - Distributed computing patterns
+
+### Technical Details
+- **API Compatibility**: Slurm REST API v0.0.40-v0.0.44
+- **Python Support**: 3.8, 3.9, 3.10, 3.11
+- **Airflow Support**: 2.5.0+ and 3.x
+- **Live Testing**: Jobs successfully completed on Slurm 25.11.1
+
+---
+
+## Historical Development (pre-release)
 
 ### Added
 
