@@ -5,9 +5,19 @@ via the REST API. It can be used by operators, sensors, and other components.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
-from airflow.hooks.base import BaseHook
+# Airflow 2.x/3.x compatibility for BaseHook import
+try:
+    # Airflow 3.x
+    from airflow.hooks.base import BaseHook
+except ImportError:
+    try:
+        # Airflow 2.x
+        from airflow.hooks.base_hook import BaseHook  # type: ignore[no-redef]
+    except ImportError:
+        # Fallback for older versions
+        from airflow.hooks.base import BaseHook  # type: ignore[no-redef]
 
 from airflow_provider_slurm.exceptions import SlurmAPIError, SlurmConfigurationError
 from airflow_provider_slurm.slurm_api_client import SlurmAPIClient
@@ -89,7 +99,7 @@ class SlurmHook(BaseHook):
         logger.info(f"Initialized Slurm connection to {api_url}")
         return self._client
 
-    def _get_connection_details(self) -> tuple[str, Optional[str]]:
+    def _get_connection_details(self) -> Tuple[str, Optional[str]]:
         """Get connection details from Airflow connection or parameters.
 
         Returns:
@@ -105,18 +115,24 @@ class SlurmHook(BaseHook):
         # Try to get from Airflow connection
         try:
             conn = self.get_connection(self.slurm_conn_id)
-            api_url = conn.host
+
+            # Validate host is present
+            if not conn.host:
+                raise SlurmConfigurationError(
+                    f"Host not configured in connection {self.slurm_conn_id}"
+                )
+
+            # Build URL with proper scheme
+            scheme = conn.schema if conn.schema else "https"
+            host = conn.host
+
+            # Construct base URL
             if conn.port:
-                api_url = f"{api_url}:{conn.port}"
-            if conn.schema:
-                api_url = f"{conn.schema}://{api_url}"
+                api_url = f"{scheme}://{host}:{conn.port}"
+            else:
+                api_url = f"{scheme}://{host}"
 
             username = conn.login or None
-
-            if not api_url:
-                raise SlurmConfigurationError(
-                    f"Slurm API URL not configured in connection {self.slurm_conn_id}"
-                )
 
             return api_url, username
 
@@ -246,7 +262,7 @@ class SlurmHook(BaseHook):
         return job_info
 
     def get_jobs(
-        self, job_ids: Optional[List[int]] = None
+        self, job_ids: Optional[Sequence[Union[int, str]]] = None
     ) -> List[Dict[str, Any]]:
         """Get status of multiple jobs.
 
@@ -257,7 +273,9 @@ class SlurmHook(BaseHook):
             List of job status dictionaries
         """
         client = self.get_conn()
-        result = client.get_jobs(job_ids=job_ids)
+        # Convert Sequence to List for API client
+        job_ids_list = list(job_ids) if job_ids is not None else None
+        result = client.get_jobs(job_ids=job_ids_list)
         return result.get("jobs", [])
 
     def cancel_job(self, job_id: int) -> bool:
@@ -314,13 +332,9 @@ class SlurmHook(BaseHook):
             logger.debug(f"Job {job_id} is in state {state}, waiting...")
             time.sleep(poll_interval)
 
-        raise SlurmAPIError(
-            f"Job {job_id} did not complete within {timeout} seconds"
-        )
+        raise SlurmAPIError(f"Job {job_id} did not complete within {timeout} seconds")
 
-    def get_job_history(
-        self, job_id: int
-    ) -> Optional[Dict[str, Any]]:
+    def get_job_history(self, job_id: int) -> Optional[Dict[str, Any]]:
         """Get historical information for a completed job.
 
         Args:

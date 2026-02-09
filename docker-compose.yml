@@ -27,10 +27,15 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      # Core settings (compatible with Airflow 2.x and 3.x)
       AIRFLOW__CORE__EXECUTOR: airflow_provider_slurm.SlurmExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+      # Database - Airflow 3.x format
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      # Database - Airflow 2.x fallback (deprecated but still works)
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      # Slurm executor configuration
       AIRFLOW__SLURM__API_URL: http://slurm-mock:6820
       AIRFLOW__SLURM__DEFAULT_PARTITION: compute
       AIRFLOW__SLURM__DEFAULT_CPUS: 1
@@ -66,9 +71,14 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      # Core settings (compatible with Airflow 2.x and 3.x)
       AIRFLOW__CORE__EXECUTOR: airflow_provider_slurm.SlurmExecutor
-      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      # Database - Airflow 3.x format
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      # Database - Airflow 2.x fallback (deprecated but still works)
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      # Slurm executor configuration
       AIRFLOW__SLURM__API_URL: http://slurm-mock:6820
       AIRFLOW__SLURM__DEFAULT_PARTITION: compute
       AIRFLOW__SLURM__DEFAULT_CPUS: 1

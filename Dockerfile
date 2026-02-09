@@ -22,9 +22,11 @@ ENV AIRFLOW_HOME=/airflow \
 # Create airflow directory
 RUN mkdir -p ${AIRFLOW_HOME}/dags ${AIRFLOW_HOME}/logs ${AIRFLOW_HOME}/plugins
 
-# Install Apache Airflow
+# Install Apache Airflow with PostgreSQL support
 ARG AIRFLOW_VERSION=2.8.1
-RUN pip install --no-cache-dir "apache-airflow==${AIRFLOW_VERSION}" \
+RUN pip install --no-cache-dir \
+    "apache-airflow[postgres]==${AIRFLOW_VERSION}" \
+    "psycopg2-binary>=2.9.0" \
     --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-3.11.txt"
 
 # Copy provider source code

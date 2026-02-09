@@ -7,7 +7,6 @@ import pytest
 from airflow.models.taskinstance import TaskInstanceKey
 
 from airflow_provider_slurm.slurm_api_client import SlurmAPIClient
-from airflow_provider_slurm.slurm_executor import SlurmExecutor
 from airflow_provider_slurm.slurm_token_manager import SlurmTokenManager
 
 
@@ -57,12 +56,16 @@ def mock_airflow_conf():
         (section, key), fallback
     )
 
-    mock_conf.getint.side_effect = lambda section, key, fallback=None: config_int_values.get(
-        (section, key), fallback
+    mock_conf.getint.side_effect = (
+        lambda section, key, fallback=None: config_int_values.get(
+            (section, key), fallback
+        )
     )
 
-    mock_conf.getfloat.side_effect = lambda section, key, fallback=None: config_float_values.get(
-        (section, key), fallback
+    mock_conf.getfloat.side_effect = (
+        lambda section, key, fallback=None: config_float_values.get(
+            (section, key), fallback
+        )
     )
 
     return mock_conf

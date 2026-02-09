@@ -142,3 +142,8 @@ slurm_manifests/
 *.out
 *.err
 slurm-*.out
+
+# Beads task management
+.beads/
+AGENTS.md
+.gitattributes
