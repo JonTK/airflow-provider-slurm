@@ -145,7 +145,7 @@ class SlurmHook(BaseHook):
                 f"Failed to get Slurm connection details: {e}"
             ) from e
 
-    def test_connection(self) -> tuple[bool, str]:
+    def test_connection(self) -> Tuple[bool, str]:
         """Test the Slurm API connection.
 
         Returns:

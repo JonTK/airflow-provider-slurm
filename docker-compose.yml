@@ -6,6 +6,8 @@ services:
     image: postgres:15-alpine
     environment:
       POSTGRES_USER: airflow
+      # WARNING: Change these credentials for production use
+      # These default credentials are for development only
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
     volumes:
