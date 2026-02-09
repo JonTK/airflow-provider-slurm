@@ -5,19 +5,23 @@ via the REST API. It can be used by operators, sensors, and other components.
 """
 
 import logging
+import warnings
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 # Airflow 2.x/3.x compatibility for BaseHook import
-try:
-    # Airflow 3.x
-    from airflow.hooks.base import BaseHook
-except ImportError:
+# Suppress deprecation warnings during import to support both versions
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
     try:
-        # Airflow 2.x
-        from airflow.hooks.base_hook import BaseHook  # type: ignore[no-redef]
+        # Airflow 3.x
+        from airflow.hooks.base import BaseHook  # type: ignore[import-untyped]
     except ImportError:
-        # Fallback for older versions
-        from airflow.hooks.base import BaseHook  # type: ignore[no-redef]
+        try:
+            # Airflow 2.x
+            from airflow.hooks.base_hook import BaseHook  # type: ignore[import-untyped, no-redef]
+        except ImportError:
+            # Fallback for older versions
+            from airflow.hooks.base import BaseHook  # type: ignore[import-untyped, no-redef]
 
 from airflow_provider_slurm.exceptions import SlurmAPIError, SlurmConfigurationError
 from airflow_provider_slurm.slurm_api_client import SlurmAPIClient
@@ -246,7 +250,7 @@ class SlurmHook(BaseHook):
             raise SlurmAPIError(f"No job_id returned for job {job_name}")
 
         logger.info(f"Job {job_name} submitted with ID {job_id}")
-        return job_id
+        return int(job_id)
 
     def get_job_status(self, job_id: int) -> Optional[Dict[str, Any]]:
         """Get status of a specific job.

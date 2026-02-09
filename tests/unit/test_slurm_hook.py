@@ -73,7 +73,7 @@ class TestSlurmHook:
         hook = SlurmHook(slurm_conn_id="test_conn")
 
         with patch.object(hook, "get_connection", return_value=mock_conn):
-            client = hook.get_conn()
+            hook.get_conn()
 
         # Verify token manager was created
         mock_token_class.assert_called_once_with(username="testuser", lifespan=3600)
@@ -168,9 +168,7 @@ class TestSlurmHook:
         """Test test_connection handles exceptions."""
         hook = SlurmHook(api_url="https://slurm.example.com:6820")
 
-        with patch.object(
-            hook, "get_conn", side_effect=Exception("Connection error")
-        ):
+        with patch.object(hook, "get_conn", side_effect=Exception("Connection error")):
             success, message = hook.test_connection()
 
             assert success is False
