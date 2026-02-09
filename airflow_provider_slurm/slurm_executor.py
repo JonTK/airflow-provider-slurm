@@ -280,6 +280,14 @@ class SlurmExecutor(BaseExecutor):
         if container:
             job_params["container"] = container
 
+        # GRES (Generic RESource) support - for GPU, MIC, etc.
+        if config.get("gres"):
+            job_params["gres"] = config["gres"]
+
+        # Node constraints for heterogeneous clusters
+        if config.get("constraint"):
+            job_params["constraints"] = config["constraint"]
+
         return {
             "script": script,
             "job": job_params,

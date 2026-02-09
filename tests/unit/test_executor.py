@@ -239,6 +239,54 @@ class TestSlurmExecutor:
         assert job_spec["job"]["memory_per_node"] == "16G"
         assert job_spec["job"]["partition"] == "gpu"
 
+    def test_build_job_spec_with_gres(self, executor, task_key):
+        """Test job specification building with GRES (GPU) resources."""
+        command = ["airflow", "tasks", "run"]
+        executor_config = {
+            "cpus_per_task": 4,
+            "mem": "16G",
+            "partition": "gpu",
+            "gres": "gpu:2",
+        }
+
+        job_spec = executor._build_job_spec(task_key, command, None, executor_config)
+
+        assert "gres" in job_spec["job"]
+        assert job_spec["job"]["gres"] == "gpu:2"
+
+    def test_build_job_spec_with_constraint(self, executor, task_key):
+        """Test job specification building with node constraints."""
+        command = ["airflow", "tasks", "run"]
+        executor_config = {
+            "cpus_per_task": 2,
+            "mem": "8G",
+            "partition": "compute",
+            "constraint": "volta",
+        }
+
+        job_spec = executor._build_job_spec(task_key, command, None, executor_config)
+
+        assert "constraints" in job_spec["job"]
+        assert job_spec["job"]["constraints"] == "volta"
+
+    def test_build_job_spec_with_gres_and_constraint(self, executor, task_key):
+        """Test job specification building with both GRES and constraints."""
+        command = ["airflow", "tasks", "run"]
+        executor_config = {
+            "cpus_per_task": 8,
+            "mem": "32G",
+            "partition": "gpu",
+            "gres": "gpu:tesla_v100:4",
+            "constraint": "nvlink",
+        }
+
+        job_spec = executor._build_job_spec(task_key, command, None, executor_config)
+
+        assert "gres" in job_spec["job"]
+        assert job_spec["job"]["gres"] == "gpu:tesla_v100:4"
+        assert "constraints" in job_spec["job"]
+        assert job_spec["job"]["constraints"] == "nvlink"
+
     @patch("airflow_provider_slurm.slurm_executor.SlurmAPIClient")
     def test_sync_completed_job(self, mock_api_client, executor, task_key):
         """Test sync with completed job."""

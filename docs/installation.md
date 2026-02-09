@@ -6,7 +6,7 @@ This guide covers installation and setup of the Airflow Provider Slurm.
 
 Before installing, ensure you have:
 
-- **Python**: 3.8, 3.9, 3.10, or 3.11
+- **Python**: 3.9, 3.10, or 3.11
 - **Apache Airflow**: 2.5.0 or later (including 3.x)
 - **Slurm**: 23.11+ with REST API enabled
 - **scontrol**: Available in PATH for token generation

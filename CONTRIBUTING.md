@@ -6,7 +6,7 @@ Thank you for your interest in contributing to the Airflow Provider Slurm projec
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.9+
 - Git
 - Access to a Slurm cluster (for integration testing)
 

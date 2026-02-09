@@ -1,0 +1,125 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database for Airflow metadata
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    networks:
+      - airflow-network
+
+  # Airflow webserver
+  airflow-webserver:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: airflow_provider_slurm.SlurmExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+      AIRFLOW__SLURM__API_URL: http://slurm-mock:6820
+      AIRFLOW__SLURM__DEFAULT_PARTITION: compute
+      AIRFLOW__SLURM__DEFAULT_CPUS: 1
+      AIRFLOW__SLURM__DEFAULT_MEM: 4G
+      AIRFLOW__SLURM__DEFAULT_TIME_LIMIT: 01:00:00
+      AIRFLOW__SLURM__SYNC_INTERVAL: 5.0
+    volumes:
+      - ./airflow_provider_slurm:/workspace/airflow_provider_slurm
+      - ./tests:/workspace/tests
+      - ./examples/dags:/airflow/dags
+      - airflow-logs:/airflow/logs
+    ports:
+      - "8080:8080"
+    command: >
+      bash -c "airflow db migrate &&
+               airflow users create \
+                 --username admin \
+                 --firstname Admin \
+                 --lastname User \
+                 --role Admin \
+                 --email admin@example.com \
+                 --password admin || true &&
+               airflow webserver"
+    networks:
+      - airflow-network
+
+  # Airflow scheduler
+  airflow-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: airflow_provider_slurm.SlurmExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__SLURM__API_URL: http://slurm-mock:6820
+      AIRFLOW__SLURM__DEFAULT_PARTITION: compute
+      AIRFLOW__SLURM__DEFAULT_CPUS: 1
+      AIRFLOW__SLURM__DEFAULT_MEM: 4G
+      AIRFLOW__SLURM__DEFAULT_TIME_LIMIT: 01:00:00
+      AIRFLOW__SLURM__SYNC_INTERVAL: 5.0
+    volumes:
+      - ./airflow_provider_slurm:/workspace/airflow_provider_slurm
+      - ./tests:/workspace/tests
+      - ./examples/dags:/airflow/dags
+      - airflow-logs:/airflow/logs
+    command: airflow scheduler
+    networks:
+      - airflow-network
+
+  # Mock Slurm REST API for development/testing
+  slurm-mock:
+    image: mockoon/cli:latest
+    ports:
+      - "6820:6820"
+    volumes:
+      - ./docker/mockoon-slurm-api.json:/data/mockoon-slurm-api.json:ro
+    command: -d /data/mockoon-slurm-api.json -i 0 -p 6820
+    networks:
+      - airflow-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6820/openapi/v3"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Development container for running tests and development tasks
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./:/workspace
+      - dev-venv:/workspace/.venv
+    command: sleep infinity
+    networks:
+      - airflow-network
+    environment:
+      PYTHONPATH: /workspace
+      AIRFLOW__SLURM__API_URL: http://slurm-mock:6820
+
+networks:
+  airflow-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  airflow-logs:
+  dev-venv:
