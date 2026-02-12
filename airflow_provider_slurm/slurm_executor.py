@@ -196,26 +196,50 @@ class SlurmExecutor(BaseExecutor):
             command: Command to execute
             queue: Airflow queue (can map to Slurm partition)
             executor_config: Task-specific Slurm configuration
+                - array: Array specification (e.g., "0-99", "1-100:2")
+                - All other standard Slurm parameters
         """
         try:
-            logger.info(f"Submitting task {key} to Slurm")
+            config = executor_config or {}
+            array_spec = config.get("array")
+
+            if array_spec:
+                logger.info(
+                    f"Submitting task {key} to Slurm as array job: {array_spec}"
+                )
+            else:
+                logger.info(f"Submitting task {key} to Slurm")
 
             # Build job specification
-            job_spec = self._build_job_spec(key, command, queue, executor_config)
+            job_spec, array = self._build_job_spec(key, command, queue, executor_config)
 
             # Submit to Slurm
             assert self.slurm_client is not None, "Executor not started"
-            result = self.slurm_client.submit_job(job_spec)
+            result = self.slurm_client.submit_job(job_spec, array=array)
             job_id = result.get("job_id")
 
             if job_id:
-                # Track the job
-                self.running[key] = {
+                # Track the job with array metadata
+                job_metadata: Dict[str, Any] = {
                     "slurm_job_id": job_id,
                     "command": command,
                     "submit_time": datetime.now(),
                 }
-                logger.info(f"Task {key} submitted as Slurm job {job_id}")
+
+                # Store array information if this is an array job
+                if array:
+                    job_metadata["array_spec"] = array
+                    job_metadata["array_task_count"] = result.get("array_task_count", 0)
+                    job_metadata["is_array"] = True
+                    logger.info(
+                        f"Task {key} submitted as Slurm array job {job_id} "
+                        f"({job_metadata['array_task_count']} tasks)"
+                    )
+                else:
+                    job_metadata["is_array"] = False
+                    logger.info(f"Task {key} submitted as Slurm job {job_id}")
+
+                self.running[key] = job_metadata
             else:
                 raise SlurmJobSubmissionError(f"No job_id returned for task {key}")
 
@@ -229,7 +253,7 @@ class SlurmExecutor(BaseExecutor):
         command: Sequence[str],
         queue: Optional[str],
         executor_config: Optional[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+    ) -> tuple[Dict[str, Any], Optional[str]]:
         """Build Slurm job specification for a task.
 
         Args:
@@ -239,9 +263,12 @@ class SlurmExecutor(BaseExecutor):
             executor_config: Task-specific configuration
 
         Returns:
-            Job specification dictionary
+            Tuple of (job_spec_dict, array_spec_or_none)
         """
         config = executor_config or {}
+
+        # Extract array parameter (don't include in job params)
+        array_spec = config.get("array")
 
         # Build job name
         job_name = self._build_job_name(key)
@@ -288,10 +315,12 @@ class SlurmExecutor(BaseExecutor):
         if config.get("constraint"):
             job_params["constraints"] = config["constraint"]
 
-        return {
+        job_spec = {
             "script": script,
             "job": job_params,
         }
+
+        return job_spec, array_spec
 
     def _build_job_name(self, key: TaskInstanceKey) -> str:
         """Build Slurm job name that encodes task identity.
@@ -427,26 +456,29 @@ class SlurmExecutor(BaseExecutor):
         logger.debug(f"Syncing status for {len(self.running)} running tasks")
 
         try:
-            # Get all job IDs we're tracking
-            job_ids = [info["slurm_job_id"] for info in self.running.values()]
-
-            # Query Slurm for job statuses
             assert self.slurm_client is not None, "Executor not started"
-            result = self.slurm_client.get_jobs(job_ids=job_ids)
-            jobs = result.get("jobs", [])
-
-            # Build lookup by job ID
-            job_statuses = {job["job_id"]: job for job in jobs}
 
             # Update state for each tracked task
             for key, job_info in list(self.running.items()):
                 slurm_job_id = job_info["slurm_job_id"]
+                is_array = job_info.get("is_array", False)
 
-                if slurm_job_id in job_statuses:
-                    # Job found in active queue
-                    self._handle_job_state(key, job_statuses[slurm_job_id])
-                else:
-                    # Job not in active queue - check history or mark missing
+                try:
+                    if is_array:
+                        # For array jobs, get aggregated status
+                        array_status = self.slurm_client.get_array_status(slurm_job_id)
+                        self._handle_array_job_state(key, array_status)
+                    else:
+                        # For single jobs, get individual status
+                        job_data = self.slurm_client.get_job(slurm_job_id)
+                        if job_data:
+                            self._handle_job_state(key, job_data)
+                        else:
+                            # Job not found - check history or mark missing
+                            self._handle_missing_job(key, job_info)
+
+                except SlurmAPIError as e:
+                    logger.debug(f"Could not query status for job {slurm_job_id}: {e}")
                     self._handle_missing_job(key, job_info)
 
         except Exception as e:
@@ -491,6 +523,65 @@ class SlurmExecutor(BaseExecutor):
 
         # Unknown state
         logger.warning(f"Unknown Slurm state '{state}' for task {key}")
+
+    def _handle_array_job_state(
+        self, key: TaskInstanceKey, array_status: Dict[str, Any]
+    ) -> None:
+        """Process aggregated array job state and update Airflow task state.
+
+        Args:
+            key: Task instance key
+            array_status: Aggregated array status from get_array_status()
+        """
+        state = array_status.get("state", "UNKNOWN")
+        job_id = array_status.get("job_id")
+        total_tasks = array_status.get("total_tasks", 0)
+        completed = array_status.get("completed", 0)
+        failed = array_status.get("failed", 0)
+        running = array_status.get("running", 0)
+
+        logger.debug(
+            f"Task {key} array job {job_id} in state {state} "
+            f"({completed}/{total_tasks} completed, {failed} failed, {running} running)"
+        )
+
+        # States that don't require action (still processing)
+        if state in ["PENDING", "RUNNING"]:
+            return
+
+        # All tasks completed successfully
+        if state == "COMPLETED":
+            self.success(key)
+            logger.info(
+                f"Task {key} array job {job_id} completed successfully "
+                f"({total_tasks} tasks)"
+            )
+            del self.running[key]
+            return
+
+        # Some tasks failed, some succeeded
+        if state == "PARTIALLY_COMPLETED":
+            # Mark task as failed since not all array tasks succeeded
+            self.fail(key)
+            logger.error(
+                f"Task {key} array job {job_id} partially completed: "
+                f"{completed} succeeded, {failed} failed"
+            )
+            del self.running[key]
+            return
+
+        # All tasks failed or job cancelled
+        if state in ["FAILED", "CANCELLED"]:
+            self.fail(key)
+            logger.error(
+                f"Task {key} array job {job_id} failed: {state} "
+                f"({failed}/{total_tasks} tasks failed)"
+            )
+            del self.running[key]
+            return
+
+        # Unknown state
+        logger.warning(f"Unknown array job state '{state}' for task {key}")
 
     def _handle_missing_job(
         self, key: TaskInstanceKey, job_info: Dict[str, Any]
