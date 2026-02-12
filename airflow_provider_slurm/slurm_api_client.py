@@ -2,8 +2,9 @@
 
 import json
 import logging
+import re
 import time
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.parse import urljoin
 
 import requests
@@ -162,21 +163,140 @@ class SlurmAPIClient:
 
         return version  # type: ignore[no-any-return]
 
-    def submit_job(self, job_spec: Dict[str, Any]) -> Dict[str, Any]:
+    @staticmethod
+    def validate_array_spec(array_spec: str) -> Tuple[bool, Optional[str]]:
+        """Validate Slurm array job specification.
+
+        Args:
+            array_spec: Array specification string
+
+        Returns:
+            Tuple of (is_valid, error_message)
+
+        Valid formats:
+            - Range: "0-99", "1-100"
+            - Range with step: "0-99:5", "1-100:2"
+            - Explicit list: "1,5,10,15,20"
+            - Max concurrent tasks: "0-99%10" (range with limit)
+        """
+        if not array_spec or not isinstance(array_spec, str):
+            return False, "Array spec must be a non-empty string"
+
+        # Remove whitespace
+        spec = array_spec.strip()
+
+        # Pattern for valid array specifications
+        # Matches: N-M, N-M:S, N-M%L, N-M:S%L, or N,N,N...
+        patterns = [
+            r"^\d+$",  # Single task (technically valid but not an array)
+            r"^\d+-\d+$",  # Range: 0-99
+            r"^\d+-\d+:\d+$",  # Step: 0-99:5
+            r"^\d+-\d+%\d+$",  # Range with limit: 0-99%10
+            r"^\d+-\d+:\d+%\d+$",  # Step with limit: 0-99:5%10
+            r"^\d+(,\d+)+$",  # List: 1,5,10 (at least 2 items)
+        ]
+
+        for pattern in patterns:
+            if re.match(pattern, spec):
+                # Additional validation for ranges
+                if "-" in spec:
+                    # Extract start and end
+                    range_part = spec.split("%")[0].split(":")[0]
+                    start, end = map(int, range_part.split("-"))
+                    if start > end:
+                        return False, f"Invalid range: start ({start}) > end ({end})"
+                    if start < 0:
+                        return False, f"Array indices must be non-negative"
+                return True, None
+
+        return (
+            False,
+            f"Invalid array specification '{spec}'. "
+            "Valid formats: '0-99', '0-99:5', '0-99%10', '1,5,10,15'",
+        )
+
+    @staticmethod
+    def parse_array_spec(array_spec: str) -> int:
+        """Calculate total number of tasks in an array specification.
+
+        Args:
+            array_spec: Array specification string
+
+        Returns:
+            Total number of tasks
+
+        Examples:
+            "0-99" -> 100
+            "0-99:5" -> 20
+            "1,5,10,15" -> 4
+        """
+        spec = array_spec.strip().split("%")[0]  # Remove limit if present
+
+        # Range with step
+        if ":" in spec:
+            range_part, step_str = spec.split(":")
+            start, end = map(int, range_part.split("-"))
+            step = int(step_str)
+            return len(range(start, end + 1, step))
+
+        # Simple range
+        elif "-" in spec:
+            start, end = map(int, spec.split("-"))
+            return end - start + 1
+
+        # Explicit list
+        elif "," in spec:
+            return len(spec.split(","))
+
+        # Single value
+        else:
+            return 1
+
+    def submit_job(
+        self, job_spec: Dict[str, Any], array: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Submit a job to Slurm.
 
         Args:
             job_spec: Job specification dictionary with 'script' and 'job' keys
+            array: Optional array specification (e.g., "0-99", "1-100:2", "1,5,10")
 
         Returns:
-            Response dictionary containing job_id
+            Response dictionary containing:
+                - job_id: Parent job ID
+                - array: Array specification (if array job)
+                - array_task_count: Number of array tasks (if array job)
 
         Raises:
-            SlurmAPIError: If job submission fails
+            SlurmAPIError: If job submission fails or array spec is invalid
+
+        Examples:
+            >>> # Submit single job
+            >>> client.submit_job(job_spec)
+            {'job_id': 12345}
+
+            >>> # Submit array job
+            >>> client.submit_job(job_spec, array="0-99")
+            {'job_id': 12345, 'array': '0-99', 'array_task_count': 100}
         """
+        # Validate array specification if provided
+        if array:
+            is_valid, error_msg = self.validate_array_spec(array)
+            if not is_valid:
+                raise SlurmAPIError(f"Invalid array specification: {error_msg}")
+
+            # Add array to job spec
+            if "job" not in job_spec:
+                job_spec["job"] = {}
+            job_spec["job"]["array"] = array
+            logger.info(f"Submitting array job with spec: {array}")
+
         endpoint = f"/slurm/{self.api_version}/job/submit"
 
-        logger.info(f"Submitting job: {job_spec.get('job', {}).get('name', 'unknown')}")
+        job_name = job_spec.get("job", {}).get("name", "unknown")
+        logger.info(
+            f"Submitting job: {job_name}" + (f" (array: {array})" if array else "")
+        )
         logger.debug(f"Job specification: {json.dumps(job_spec, indent=2)}")
 
         response = self._request("POST", endpoint, json_data=job_spec)
@@ -191,7 +311,17 @@ class SlurmAPIClient:
         if not job_id:
             raise SlurmAPIError(f"No job_id in submission response: {result}")
 
-        logger.info(f"Successfully submitted job {job_id}")
+        # Enrich response with array information
+        if array:
+            result["array"] = array
+            result["array_task_count"] = self.parse_array_spec(array)
+            logger.info(
+                f"Successfully submitted array job {job_id} "
+                f"with {result['array_task_count']} tasks"
+            )
+        else:
+            logger.info(f"Successfully submitted job {job_id}")
+
         return result  # type: ignore[no-any-return]
 
     def get_jobs(
@@ -318,6 +448,152 @@ class SlurmAPIClient:
         # If not found, the job might be too old or purged
         logger.debug(f"Job {job_id} not found in job history")
         return None
+
+    def get_array_status(self, job_id: int) -> Dict[str, Any]:
+        """Get aggregated status for an array job.
+
+        Queries all tasks in an array job and aggregates their states.
+
+        Args:
+            job_id: Array job ID (parent job ID)
+
+        Returns:
+            Dictionary with:
+                - job_id: Array job ID
+                - array_spec: Array specification if available
+                - total_tasks: Total number of array tasks
+                - completed: Number of completed tasks
+                - running: Number of running tasks
+                - pending: Number of pending tasks
+                - failed: Number of failed tasks
+                - state: Aggregated state (PENDING/RUNNING/COMPLETED/PARTIALLY_COMPLETED/FAILED)
+                - tasks: Optional list of individual task details
+
+        Raises:
+            SlurmAPIError: If query fails
+        """
+        logger.debug(f"Getting array status for job {job_id}")
+
+        # Query all jobs - Slurm returns array tasks as separate entries
+        result = self.get_jobs([job_id])
+        jobs = result.get("jobs", [])
+
+        if not jobs:
+            # Try history
+            job_info = self.get_job_history(job_id)
+            if job_info:
+                jobs = [job_info]
+
+        if not jobs:
+            raise SlurmAPIError(f"Array job {job_id} not found")
+
+        # Aggregate states
+        state_counts = {
+            "PENDING": 0,
+            "RUNNING": 0,
+            "COMPLETED": 0,
+            "FAILED": 0,
+            "CANCELLED": 0,
+            "TIMEOUT": 0,
+        }
+
+        array_spec = None
+        task_details = []
+
+        for job in jobs:
+            state = job.get("job_state", "UNKNOWN")
+            if isinstance(state, list):
+                state = state[0] if state else "UNKNOWN"
+
+            # Count states
+            if state in state_counts:
+                state_counts[state] += 1
+            elif state in ["COMPLETING", "CONFIGURING"]:
+                state_counts["RUNNING"] += 1
+            elif "FAIL" in state.upper():
+                state_counts["FAILED"] += 1
+
+            # Extract array info
+            if not array_spec:
+                # Try to get array specification from job info
+                array_job_id = job.get("array_job_id")
+                array_task_id = job.get("array_task_id")
+                if array_job_id and array_task_id is not None:
+                    # This is an array task
+                    pass  # array_spec would need to be reconstructed or stored
+
+            task_details.append(
+                {
+                    "task_id": job.get("array_task_id", 0),
+                    "state": state,
+                    "exit_code": job.get("exit_code"),
+                }
+            )
+
+        total = len(jobs)
+        completed = state_counts["COMPLETED"]
+        running = state_counts["RUNNING"]
+        pending = state_counts["PENDING"]
+        failed = (
+            state_counts["FAILED"] + state_counts["CANCELLED"] + state_counts["TIMEOUT"]
+        )
+
+        # Determine aggregated state
+        if failed == total:
+            agg_state = "FAILED"
+        elif completed == total:
+            agg_state = "COMPLETED"
+        elif failed > 0 and (completed + failed) == total:
+            agg_state = "PARTIALLY_COMPLETED"
+        elif running > 0:
+            agg_state = "RUNNING"
+        else:
+            agg_state = "PENDING"
+
+        return {
+            "job_id": job_id,
+            "array_spec": array_spec,
+            "total_tasks": total,
+            "completed": completed,
+            "running": running,
+            "pending": pending,
+            "failed": failed,
+            "state": agg_state,
+            "tasks": task_details,
+        }
+
+    def cancel_array_task(
+        self, job_id: int, array_task_id: Optional[int] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Cancel an entire array job or specific array task.
+
+        Args:
+            job_id: Array job ID
+            array_task_id: Specific task ID to cancel. If None, cancels entire array.
+
+        Returns:
+            Response dictionary or None if job doesn't exist
+
+        Raises:
+            SlurmAPIError: If cancellation fails
+
+        Examples:
+            >>> # Cancel entire array
+            >>> client.cancel_array_task(12345)
+
+            >>> # Cancel specific task
+            >>> client.cancel_array_task(12345, array_task_id=5)
+        """
+        if array_task_id is not None:
+            # Cancel specific array task
+            # Slurm uses job_id_task_id format
+            full_job_id = f"{job_id}_{array_task_id}"
+            logger.info(f"Cancelling array task {full_job_id}")
+            return self.cancel_job(full_job_id)
+        else:
+            # Cancel entire array
+            logger.info(f"Cancelling entire array job {job_id}")
+            return self.cancel_job(job_id)
 
     def ping(self) -> bool:
         """Test API connectivity.
