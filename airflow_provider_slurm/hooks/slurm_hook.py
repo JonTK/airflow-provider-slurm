@@ -176,6 +176,7 @@ class SlurmHook(BaseHook):
         constraint: Optional[str] = None,
         account: Optional[str] = None,
         qos: Optional[str] = None,
+        array: Optional[str] = None,
         **kwargs: Any,
     ) -> int:
         """Submit a job to Slurm.
@@ -195,13 +196,27 @@ class SlurmHook(BaseHook):
             constraint: Node constraints
             account: Slurm account
             qos: Quality of Service
+            array: Array specification (e.g., "0-99", "1-100:2", "0-99%10")
             **kwargs: Additional job parameters
 
         Returns:
-            Job ID of submitted job
+            Job ID of submitted job (parent job ID for arrays)
 
         Raises:
             SlurmAPIError: If job submission fails
+
+        Examples:
+            >>> # Submit single job
+            >>> hook.submit_job(script="#!/bin/bash\\necho 'test'", job_name="test_job")
+            12345
+
+            >>> # Submit array job with 100 tasks
+            >>> hook.submit_job(
+            ...     script="#!/bin/bash\\necho $SLURM_ARRAY_TASK_ID",
+            ...     job_name="array_job",
+            ...     array="0-99"
+            ... )
+            12346  # Parent job ID
         """
         client = self.get_conn()
 
@@ -242,14 +257,24 @@ class SlurmHook(BaseHook):
             "job": job_params,
         }
 
-        logger.info(f"Submitting job {job_name} to Slurm")
-        result = client.submit_job(job_spec)
+        logger.info(
+            f"Submitting job {job_name} to Slurm"
+            + (f" (array: {array})" if array else "")
+        )
+        result = client.submit_job(job_spec, array=array)
 
         job_id = result.get("job_id")
         if not job_id:
             raise SlurmAPIError(f"No job_id returned for job {job_name}")
 
-        logger.info(f"Job {job_name} submitted with ID {job_id}")
+        if array:
+            task_count = result.get("array_task_count", "unknown")
+            logger.info(
+                f"Array job {job_name} submitted with ID {job_id} ({task_count} tasks)"
+            )
+        else:
+            logger.info(f"Job {job_name} submitted with ID {job_id}")
+
         return int(job_id)
 
     def get_job_status(self, job_id: int) -> Optional[Dict[str, Any]]:
@@ -349,6 +374,141 @@ class SlurmHook(BaseHook):
         """
         client = self.get_conn()
         return client.get_job_history(job_id)
+
+    def get_array_status(self, job_id: int) -> Dict[str, Any]:
+        """Get aggregated status for an array job.
+
+        Args:
+            job_id: Array job ID (parent job ID)
+
+        Returns:
+            Dictionary with array job status including:
+                - job_id: Array job ID
+                - total_tasks: Total number of tasks
+                - completed: Number of completed tasks
+                - running: Number of running tasks
+                - pending: Number of pending tasks
+                - failed: Number of failed tasks
+                - state: Aggregated state
+                - tasks: List of individual task details
+
+        Raises:
+            SlurmAPIError: If query fails
+
+        Example:
+            >>> hook.get_array_status(12345)
+            {
+                'job_id': 12345,
+                'total_tasks': 100,
+                'completed': 95,
+                'running': 3,
+                'pending': 0,
+                'failed': 2,
+                'state': 'PARTIALLY_COMPLETED',
+                ...
+            }
+        """
+        client = self.get_conn()
+        return client.get_array_status(job_id)
+
+    def wait_for_array(
+        self,
+        job_id: int,
+        timeout: int = 3600,
+        poll_interval: int = 10,
+        fail_on_error: bool = True,
+    ) -> Dict[str, Any]:
+        """Wait for an array job to complete.
+
+        Args:
+            job_id: Array job ID to wait for
+            timeout: Maximum wait time in seconds
+            poll_interval: Interval between status checks in seconds
+            fail_on_error: If True, raise exception on any task failure
+
+        Returns:
+            Final array status dictionary
+
+        Raises:
+            SlurmAPIError: If array job fails or times out
+
+        Example:
+            >>> # Wait for all tasks to complete
+            >>> status = hook.wait_for_array(12345)
+            >>> print(f"Completed {status['completed']}/{status['total_tasks']} tasks")
+        """
+        import time
+
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            array_status = self.get_array_status(job_id)
+            state = array_status.get("state", "UNKNOWN")
+
+            logger.debug(
+                f"Array job {job_id}: {state} "
+                f"({array_status['completed']}/{array_status['total_tasks']} completed)"
+            )
+
+            # Check terminal states
+            if state == "COMPLETED":
+                logger.info(
+                    f"Array job {job_id} completed successfully "
+                    f"({array_status['total_tasks']} tasks)"
+                )
+                return array_status
+
+            elif state == "FAILED":
+                if fail_on_error:
+                    raise SlurmAPIError(
+                        f"Array job {job_id} failed: "
+                        f"{array_status['failed']}/{array_status['total_tasks']} tasks failed"
+                    )
+                else:
+                    logger.warning(f"Array job {job_id} failed, but continuing")
+                    return array_status
+
+            elif state == "PARTIALLY_COMPLETED":
+                if fail_on_error:
+                    raise SlurmAPIError(
+                        f"Array job {job_id} partially completed: "
+                        f"{array_status['failed']} tasks failed"
+                    )
+                else:
+                    logger.warning(
+                        f"Array job {job_id} partially completed "
+                        f"({array_status['completed']} succeeded, {array_status['failed']} failed)"
+                    )
+                    return array_status
+
+            # Still running
+            time.sleep(poll_interval)
+
+        raise SlurmAPIError(
+            f"Array job {job_id} did not complete within {timeout} seconds"
+        )
+
+    def cancel_array_task(
+        self, job_id: int, array_task_id: Optional[int] = None
+    ) -> bool:
+        """Cancel an array job or specific array task.
+
+        Args:
+            job_id: Array job ID
+            array_task_id: Specific task ID to cancel (None = cancel all)
+
+        Returns:
+            True if cancellation was successful
+
+        Examples:
+            >>> # Cancel entire array
+            >>> hook.cancel_array_task(12345)
+
+            >>> # Cancel specific task
+            >>> hook.cancel_array_task(12345, array_task_id=5)
+        """
+        client = self.get_conn()
+        result = client.cancel_array_task(job_id, array_task_id)
+        return result is not None
 
     @staticmethod
     def _convert_time_to_seconds(time_str: str) -> int:
