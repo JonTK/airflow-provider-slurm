@@ -12,33 +12,53 @@ sys.path.insert(0, "/home/jontk/src/github.com/jontk/airflow-slurm-executor")
 from airflow_provider_slurm.exceptions import SlurmAPIError
 from airflow_provider_slurm.slurm_api_client import SlurmAPIClient
 from airflow_provider_slurm.slurm_token_manager import SlurmTokenManager
+from tests.utils.cluster_helpers import (
+    fetch_token_via_ssh,
+    get_cluster_config,
+    is_cluster_available,
+)
 
 
 def test_live_server():
     """Test our implementation against the live Slurm server."""
 
-    # Server configuration - update these for your server
-    BASE_URL = "http://rocky9.ar.jontk.com:6820"  # Default slurmrestd port
-    USERNAME = "root"
-
     print("🧪 Testing Airflow Slurm Executor against live server")
+    print("-" * 60)
+
+    # Check cluster availability
+    print("Checking cluster availability...")
+    if not is_cluster_available():
+        print("❌ Cluster is not available or accessible")
+        print("   Check SLURM_TEST_CLUSTER_HOST and SSH configuration")
+        return False
+
+    config = get_cluster_config()
+    BASE_URL = f"http://{config['host']}:{config['port']}"
+
     print(f"Server: {BASE_URL}")
-    print(f"User: {USERNAME}")
+    print(f"User: {config['user']}")
+    print(f"✅ Cluster {config['host']} is available")
     print("-" * 60)
 
     try:
-        # Step 1: Test Token Manager (using provided token)
-        print("1️⃣  Testing with provided token...")
-        test_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjY2Nzg5NjEsImlhdCI6MTc2NjY3NzE2MSwic3VuIjoicm9vdCJ9.FRcLY-j8uao80Obc51d7LgZd3Ql_Oan3H8anIVCjuAg"
+        # Step 1: Fetch authentication token
+        print("1️⃣  Fetching authentication token...")
+        token = fetch_token_via_ssh(
+            host=config["host"], user=config["user"], ssh_key=config["ssh_key"]
+        )
 
-        # Create a mock token manager that uses the provided token
+        if not token:
+            print("❌ Failed to fetch authentication token")
+            return False
+
+        # Create token manager with fetched token
         token_manager = MagicMock()
-        token_manager.get_token.return_value = test_token
+        token_manager.get_token.return_value = token
 
-        print(f"✅ Using provided token: {test_token[:20]}...")
+        print(f"✅ Token fetched: {token[:20]}...")
 
         # Step 2: Test API Client
-        print("\\n2️⃣  Testing SlurmAPIClient...")
+        print("\n2️⃣  Testing SlurmAPIClient...")
         api_client = SlurmAPIClient(
             base_url=BASE_URL, token_manager=token_manager, timeout=10, max_retries=2
         )
@@ -147,18 +167,23 @@ def test_live_server():
             print(f"❌ Unexpected error during job submission: {e}")
             return False
 
-        print("\\n🎉 All basic tests completed successfully!")
-        print("\\n📋 Test Summary:")
-        print("✅ Token management working")
-        print("✅ API connectivity established")
-        print("✅ Job query functionality working")
-        print("✅ Job submission API accessible")
-        print("\\n🚀 The Slurm executor should work with your cluster!")
+        print("\n🎉 All basic tests completed successfully!")
+        print("\n" + "=" * 60)
+        print("📊 Test Summary")
+        print("=" * 60)
+        print("✅ Token management: OK")
+        print("✅ API connectivity: OK")
+        print("✅ Job query functionality: OK")
+        print("✅ Job submission: OK")
+        print("✅ Job monitoring: OK")
+        print("✅ Job cancellation: OK")
+        print("=" * 60)
+        print("\n🚀 The Slurm executor should work with your cluster!")
 
         return True
 
     except Exception as e:
-        print(f"\\n💥 Unexpected error: {e}")
+        print(f"\n💥 Unexpected error: {e}")
         import traceback
 
         traceback.print_exc()

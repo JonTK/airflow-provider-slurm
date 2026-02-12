@@ -84,6 +84,10 @@ addopts = [
     "-ra",
     "--strict-markers",
 ]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "real_cluster: marks tests that run against real Slurm cluster (deselect with '-m \"not real_cluster\"')",
+]
 
 [tool.coverage.run]
 branch = true

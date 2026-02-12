@@ -11,20 +11,44 @@ from unittest.mock import MagicMock
 sys.path.insert(0, "/home/jontk/src/github.com/jontk/airflow-slurm-executor")
 
 from airflow_provider_slurm.slurm_api_client import SlurmAPIClient
+from tests.utils.cluster_helpers import (
+    fetch_token_via_ssh,
+    get_cluster_config,
+    is_cluster_available,
+)
 
-# Server configuration
-BASE_URL = "http://rocky9.ar.jontk.com:6820"
-TEST_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjY2Nzg5NjEsImlhdCI6MTc2NjY3NzE2MSwic3VuIjoicm9vdCJ9.FRcLY-j8uao80Obc51d7LgZd3Ql_Oan3H8anIVCjuAg"
+# Global configuration - will be initialized in main
+_CLIENT = None
 
 
 def create_api_client():
-    """Create API client with test token."""
-    token_manager = MagicMock()
-    token_manager.get_token.return_value = TEST_TOKEN
+    """Create API client with real token from cluster."""
+    global _CLIENT
+    if _CLIENT is None:
+        # Check cluster availability
+        if not is_cluster_available():
+            raise RuntimeError("Cluster is not available or accessible")
 
-    return SlurmAPIClient(
-        base_url=BASE_URL, token_manager=token_manager, timeout=30, max_retries=2
-    )
+        config = get_cluster_config()
+
+        # Fetch token automatically
+        token = fetch_token_via_ssh(
+            host=config["host"], user=config["user"], ssh_key=config["ssh_key"]
+        )
+
+        if not token:
+            raise RuntimeError("Failed to fetch authentication token")
+
+        # Create client
+        token_manager = MagicMock()
+        token_manager.get_token.return_value = token
+        base_url = f"http://{config['host']}:{config['port']}"
+
+        _CLIENT = SlurmAPIClient(
+            base_url=base_url, token_manager=token_manager, timeout=30, max_retries=2
+        )
+
+    return _CLIENT
 
 
 def test_basic_echo_job():
@@ -327,7 +351,11 @@ exit 42""",
 
 def submit_and_monitor_job(job_spec, test_name, expect_failure=False, max_wait=300):
     """Submit a job and monitor it to completion."""
-    client = create_api_client()
+    try:
+        client = create_api_client()
+    except RuntimeError as e:
+        print(f"❌ {test_name}: Failed to create API client - {e}")
+        return False
 
     try:
         print(f"Submitting {test_name} job...")
@@ -408,7 +436,20 @@ def run_all_tests():
     """Run comprehensive test suite."""
     print("🚀 Starting Comprehensive Slurm Executor Test Suite")
     print("=" * 60)
-    print(f"Target: {BASE_URL}")
+
+    # Check cluster availability first
+    print("Checking cluster availability...")
+    if not is_cluster_available():
+        print("❌ Cluster is not available or accessible")
+        print("   Check SLURM_TEST_CLUSTER_HOST and SSH configuration")
+        return False
+
+    config = get_cluster_config()
+    base_url = f"http://{config['host']}:{config['port']}"
+
+    print(f"Target: {base_url}")
+    print(f"User: {config['user']}")
+    print(f"✅ Cluster {config['host']} is available")
     print(f"Time: {datetime.now()}")
     print("=" * 60)
 

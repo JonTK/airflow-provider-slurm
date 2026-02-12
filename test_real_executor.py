@@ -13,20 +13,45 @@ from airflow.models.taskinstance import TaskInstanceKey
 
 from airflow_provider_slurm.slurm_executor import SlurmExecutor
 from airflow_provider_slurm.slurm_token_manager import SlurmTokenManager
-
-BASE_URL = "http://rocky9.ar.jontk.com:6820"
-TEST_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjY2Nzg5NjEsImlhdCI6MTc2NjY3NzE2MSwic3VuIjoicm9vdCJ9.FRcLY-j8uao80Obc51d7LgZd3Ql_Oan3H8anIVCjuAg"
+from tests.utils.cluster_helpers import (
+    fetch_token_via_ssh,
+    get_cluster_config,
+    is_cluster_available,
+)
 
 
 def main():
     print("🧪 Testing Real SlurmExecutor")
     print("-" * 35)
 
+    # Check cluster availability
+    print("Checking cluster availability...")
+    if not is_cluster_available():
+        print("❌ Cluster is not available or accessible")
+        print("   Check SLURM_TEST_CLUSTER_HOST and SSH configuration")
+        return False
+
+    config = get_cluster_config()
+    BASE_URL = f"http://{config['host']}:{config['port']}"
+    print(f"✅ Cluster {config['host']} is available\n")
+
+    # Fetch token automatically
+    print("Fetching authentication token...")
+    TEST_TOKEN = fetch_token_via_ssh(
+        host=config["host"], user=config["user"], ssh_key=config["ssh_key"]
+    )
+
+    if not TEST_TOKEN:
+        print("❌ Failed to fetch authentication token")
+        return False
+
+    print(f"✅ Token fetched: {TEST_TOKEN[:20]}...\n")
+
     # Mock Airflow config
     with patch("airflow_provider_slurm.slurm_executor.conf") as mock_conf:
         mock_conf.get.side_effect = lambda section, key, fallback=None: {
             ("slurm", "api_url"): BASE_URL,
-            ("slurm", "username"): "root",
+            ("slurm", "username"): config["user"],
             ("slurm", "default_partition"): "normal",
             ("slurm", "default_cpus"): "1",
             ("slurm", "default_mem"): "100M",
@@ -107,7 +132,20 @@ def main():
 
                 else:
                     print("❌ Task submission failed")
+                    return False
+
+                # Summary
+                print("\n" + "=" * 40)
+                print("📊 Test Summary")
+                print("=" * 40)
+                print("✅ Executor initialized: OK")
+                print("✅ Task submitted: OK")
+                print(f"✅ Slurm job {job_id}: OK")
+                print("=" * 40)
+
+                return True
 
 
 if __name__ == "__main__":
-    main()
+    success = main()
+    sys.exit(0 if success else 1)

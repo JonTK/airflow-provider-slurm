@@ -7,18 +7,44 @@ from unittest.mock import MagicMock
 sys.path.insert(0, "/home/jontk/src/github.com/jontk/airflow-slurm-executor")
 
 from airflow_provider_slurm.slurm_api_client import SlurmAPIClient
-
-BASE_URL = "http://rocky9.ar.jontk.com:6820"
-TEST_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjY2Nzg5NjEsImlhdCI6MTc2NjY3NzE2MSwic3VuIjoicm9vdCJ9.FRcLY-j8uao80Obc51d7LgZd3Ql_Oan3H8anIVCjuAg"
+from tests.utils.cluster_helpers import (
+    fetch_token_via_ssh,
+    get_cluster_config,
+    is_cluster_available,
+)
 
 
 def main():
     print("🧪 Fixed Script Format Test")
     print("-" * 30)
 
+    # Check cluster availability
+    print("Checking cluster availability...")
+    if not is_cluster_available():
+        print("❌ Cluster is not available or accessible")
+        print("   Check SLURM_TEST_CLUSTER_HOST and SSH configuration")
+        return False
+
+    config = get_cluster_config()
+    print(f"✅ Cluster {config['host']} is available")
+
+    # Fetch token automatically
+    print("Fetching authentication token...")
+    token = fetch_token_via_ssh(
+        host=config["host"], user=config["user"], ssh_key=config["ssh_key"]
+    )
+
+    if not token:
+        print("❌ Failed to fetch authentication token")
+        return False
+
+    print(f"✅ Token fetched: {token[:20]}...")
+
+    # Create API client with real token
     token_manager = MagicMock()
-    token_manager.get_token.return_value = TEST_TOKEN
-    client = SlurmAPIClient(BASE_URL, token_manager)
+    token_manager.get_token.return_value = token
+    base_url = f"http://{config['host']}:{config['port']}"
+    client = SlurmAPIClient(base_url, token_manager)
 
     # Properly formatted multi-line script
     script_content = """#!/bin/bash
@@ -48,6 +74,7 @@ echo 'Script completed successfully'
         },
     }
 
+    success = False
     try:
         response = client.submit_job(job_spec)
         job_id = response.get("job_id")
@@ -55,10 +82,28 @@ echo 'Script completed successfully'
         print(f"Monitor with: scontrol show job {job_id}")
         print(f"Check output: cat /tmp/fixed_test_{job_id}.out")
         print(f"Check errors: cat /tmp/fixed_test_{job_id}.err")
+        success = True
 
     except Exception as e:
         print(f"❌ Error: {e}")
+        import traceback
+
+        traceback.print_exc()
+        success = False
+
+    # Summary
+    print("\n" + "=" * 40)
+    print("📊 Test Summary")
+    print("=" * 40)
+    if success:
+        print("✅ All tests passed - job submitted successfully")
+    else:
+        print("❌ Test failed - see errors above")
+    print("=" * 40)
+
+    return success
 
 
 if __name__ == "__main__":
-    main()
+    success = main()
+    sys.exit(0 if success else 1)
