@@ -340,3 +340,227 @@ class TestSlurmAPIClient:
         error = exc_info.value
         assert error.status_code == 400
         assert "Bad request" in error.response_text
+
+    # Array job tests
+
+    def test_validate_array_spec_valid_range(self, api_client):
+        """Test array spec validation for valid range."""
+        is_valid, error = api_client.validate_array_spec("0-99")
+        assert is_valid is True
+        assert error is None
+
+    def test_validate_array_spec_valid_range_with_step(self, api_client):
+        """Test array spec validation for range with step."""
+        is_valid, error = api_client.validate_array_spec("0-99:5")
+        assert is_valid is True
+        assert error is None
+
+    def test_validate_array_spec_valid_list(self, api_client):
+        """Test array spec validation for explicit list."""
+        is_valid, error = api_client.validate_array_spec("1,5,10,15")
+        assert is_valid is True
+        assert error is None
+
+    def test_validate_array_spec_valid_with_limit(self, api_client):
+        """Test array spec validation with parallelism limit."""
+        is_valid, error = api_client.validate_array_spec("0-999%50")
+        assert is_valid is True
+        assert error is None
+
+    def test_validate_array_spec_invalid_format(self, api_client):
+        """Test array spec validation for invalid format."""
+        is_valid, error = api_client.validate_array_spec("abc")
+        assert is_valid is False
+        assert "Invalid array specification" in error
+
+    def test_validate_array_spec_empty(self, api_client):
+        """Test array spec validation for empty string."""
+        is_valid, error = api_client.validate_array_spec("")
+        assert is_valid is False
+        assert "Empty array specification" in error
+
+    def test_parse_array_spec_range(self, api_client):
+        """Test array spec parsing for range."""
+        start, end, step = api_client.parse_array_spec("0-99")
+        assert start == 0
+        assert end == 99
+        assert step == 1
+
+    def test_parse_array_spec_range_with_step(self, api_client):
+        """Test array spec parsing for range with step."""
+        start, end, step = api_client.parse_array_spec("10-100:5")
+        assert start == 10
+        assert end == 100
+        assert step == 5
+
+    def test_parse_array_spec_list(self, api_client):
+        """Test array spec parsing for list."""
+        start, end, step = api_client.parse_array_spec("1,5,10,15,20")
+        # For list format, return count as end
+        assert start == 0
+        assert end == 5
+        assert step == 1
+
+    def test_parse_array_spec_with_limit(self, api_client):
+        """Test array spec parsing strips parallelism limit."""
+        start, end, step = api_client.parse_array_spec("0-999%50")
+        assert start == 0
+        assert end == 999
+        assert step == 1
+
+    @responses.activate
+    def test_submit_job_with_array(self, api_client):
+        """Test job submission with array specification."""
+        job_spec = {
+            "script": "#!/bin/bash\necho $SLURM_ARRAY_TASK_ID",
+            "job": {
+                "name": "array_test",
+                "partition": "compute",
+            },
+        }
+
+        responses.add(
+            responses.POST,
+            "https://slurm.example.com:6820/slurm/v0.0.42/job/submit",
+            json={"job_id": 12345, "step_id": "0-99"},
+            status=200,
+        )
+
+        result = api_client.submit_job(job_spec, array="0-99")
+        assert result["job_id"] == 12345
+        assert result["array"] == "0-99"
+        assert result["array_task_count"] == 100
+
+        # Verify array was added to job spec
+        request_body = responses.calls[0].request.body
+        assert b'"array": "0-99"' in request_body
+
+    @responses.activate
+    def test_submit_job_with_invalid_array(self, api_client):
+        """Test job submission with invalid array spec."""
+        job_spec = {"script": "#!/bin/bash", "job": {}}
+
+        with pytest.raises(SlurmAPIError) as exc_info:
+            api_client.submit_job(job_spec, array="invalid")
+
+        assert "Invalid array specification" in str(exc_info.value)
+
+    @responses.activate
+    def test_get_array_status(self, api_client):
+        """Test getting array job status."""
+        responses.add(
+            responses.GET,
+            "https://slurm.example.com:6820/slurm/v0.0.42/jobs?job_id=12345",
+            json={
+                "jobs": [
+                    {
+                        "job_id": 12345,
+                        "array_job_id": 12345,
+                        "array_task_id": 0,
+                        "job_state": "COMPLETED",
+                    },
+                    {
+                        "job_id": 12345,
+                        "array_job_id": 12345,
+                        "array_task_id": 1,
+                        "job_state": "RUNNING",
+                    },
+                    {
+                        "job_id": 12345,
+                        "array_job_id": 12345,
+                        "array_task_id": 2,
+                        "job_state": "FAILED",
+                    },
+                ]
+            },
+            status=200,
+        )
+
+        status = api_client.get_array_status(12345)
+        assert status["job_id"] == 12345
+        assert status["total_tasks"] == 3
+        assert status["completed"] == 1
+        assert status["running"] == 1
+        assert status["failed"] == 1
+        assert status["state"] == "RUNNING"  # At least one running
+
+    @responses.activate
+    def test_get_array_status_all_completed(self, api_client):
+        """Test array status when all tasks completed."""
+        responses.add(
+            responses.GET,
+            "https://slurm.example.com:6820/slurm/v0.0.42/jobs?job_id=12345",
+            json={
+                "jobs": [
+                    {
+                        "job_id": 12345,
+                        "array_job_id": 12345,
+                        "array_task_id": i,
+                        "job_state": "COMPLETED",
+                    }
+                    for i in range(10)
+                ]
+            },
+            status=200,
+        )
+
+        status = api_client.get_array_status(12345)
+        assert status["state"] == "COMPLETED"
+        assert status["completed"] == 10
+        assert status["failed"] == 0
+
+    @responses.activate
+    def test_get_array_status_partially_completed(self, api_client):
+        """Test array status with some failures."""
+        responses.add(
+            responses.GET,
+            "https://slurm.example.com:6820/slurm/v0.0.42/jobs?job_id=12345",
+            json={
+                "jobs": [
+                    {
+                        "job_id": 12345,
+                        "array_job_id": 12345,
+                        "array_task_id": 0,
+                        "job_state": "COMPLETED",
+                    },
+                    {
+                        "job_id": 12345,
+                        "array_job_id": 12345,
+                        "array_task_id": 1,
+                        "job_state": "FAILED",
+                    },
+                ]
+            },
+            status=200,
+        )
+
+        status = api_client.get_array_status(12345)
+        assert status["state"] == "PARTIALLY_COMPLETED"
+        assert status["completed"] == 1
+        assert status["failed"] == 1
+
+    @responses.activate
+    def test_cancel_array_task_all(self, api_client):
+        """Test cancelling entire array job."""
+        responses.add(
+            responses.DELETE,
+            "https://slurm.example.com:6820/slurm/v0.0.42/job/12345",
+            json={"status": "Array job cancelled"},
+            status=200,
+        )
+
+        result = api_client.cancel_array_task(12345)
+        assert result is not None
+
+    @responses.activate
+    def test_cancel_array_task_specific(self, api_client):
+        """Test cancelling specific array task."""
+        responses.add(
+            responses.DELETE,
+            "https://slurm.example.com:6820/slurm/v0.0.42/job/12345_5",
+            json={"status": "Task cancelled"},
+            status=200,
+        )
+
+        result = api_client.cancel_array_task(12345, array_task_id=5)
+        assert result is not None

@@ -401,3 +401,209 @@ class TestSlurmHook:
 
         assert hook._client is None
         assert hook._token_manager is None
+
+    # Array job tests
+
+    def test_submit_job_with_array(self):
+        """Test submitting an array job."""
+        mock_client = MagicMock()
+        mock_client.submit_job.return_value = {
+            "job_id": 12345,
+            "array": "0-99",
+            "array_task_count": 100,
+        }
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        job_id = hook.submit_job(
+            script="#!/bin/bash\necho $SLURM_ARRAY_TASK_ID",
+            job_name="array_job",
+            array="0-99",
+        )
+
+        assert job_id == 12345
+        mock_client.submit_job.assert_called_once()
+        call_args = mock_client.submit_job.call_args
+
+        # Verify array parameter was passed
+        assert call_args[1]["array"] == "0-99"
+
+    def test_submit_job_with_array_and_parallelism(self):
+        """Test submitting array job with parallelism limit."""
+        mock_client = MagicMock()
+        mock_client.submit_job.return_value = {
+            "job_id": 12345,
+            "array": "0-999%50",
+            "array_task_count": 1000,
+        }
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        job_id = hook.submit_job(
+            script="#!/bin/bash\necho $SLURM_ARRAY_TASK_ID",
+            job_name="limited_array",
+            array="0-999%50",
+        )
+
+        assert job_id == 12345
+
+    def test_get_array_status(self):
+        """Test getting array job status."""
+        mock_client = MagicMock()
+        mock_client.get_array_status.return_value = {
+            "job_id": 12345,
+            "total_tasks": 100,
+            "completed": 95,
+            "running": 3,
+            "pending": 0,
+            "failed": 2,
+            "state": "RUNNING",
+        }
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        status = hook.get_array_status(12345)
+
+        assert status["job_id"] == 12345
+        assert status["total_tasks"] == 100
+        assert status["completed"] == 95
+        assert status["failed"] == 2
+        mock_client.get_array_status.assert_called_once_with(12345)
+
+    @patch("time.sleep")
+    def test_wait_for_array_success(self, mock_sleep):
+        """Test waiting for array job to complete successfully."""
+        mock_client = MagicMock()
+        mock_client.get_array_status.side_effect = [
+            {
+                "job_id": 12345,
+                "total_tasks": 10,
+                "completed": 5,
+                "running": 5,
+                "pending": 0,
+                "failed": 0,
+                "state": "RUNNING",
+            },
+            {
+                "job_id": 12345,
+                "total_tasks": 10,
+                "completed": 10,
+                "running": 0,
+                "pending": 0,
+                "failed": 0,
+                "state": "COMPLETED",
+            },
+        ]
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        final_status = hook.wait_for_array(12345, timeout=100, poll_interval=5)
+
+        assert final_status["state"] == "COMPLETED"
+        assert final_status["completed"] == 10
+        assert final_status["failed"] == 0
+
+    @patch("time.sleep")
+    def test_wait_for_array_with_failures(self, mock_sleep):
+        """Test waiting for array job with task failures."""
+        mock_client = MagicMock()
+        mock_client.get_array_status.return_value = {
+            "job_id": 12345,
+            "total_tasks": 10,
+            "completed": 8,
+            "running": 0,
+            "pending": 0,
+            "failed": 2,
+            "state": "PARTIALLY_COMPLETED",
+        }
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        # Test with fail_on_error=True (default)
+        with pytest.raises(SlurmAPIError) as exc_info:
+            hook.wait_for_array(12345, fail_on_error=True)
+
+        assert "partially completed" in str(exc_info.value).lower()
+
+        # Test with fail_on_error=False
+        final_status = hook.wait_for_array(12345, fail_on_error=False)
+        assert final_status["state"] == "PARTIALLY_COMPLETED"
+
+    @patch("time.sleep")
+    def test_wait_for_array_all_failed(self, mock_sleep):
+        """Test waiting for array job where all tasks failed."""
+        mock_client = MagicMock()
+        mock_client.get_array_status.return_value = {
+            "job_id": 12345,
+            "total_tasks": 10,
+            "completed": 0,
+            "running": 0,
+            "pending": 0,
+            "failed": 10,
+            "state": "FAILED",
+        }
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        with pytest.raises(SlurmAPIError) as exc_info:
+            hook.wait_for_array(12345)
+
+        assert "failed" in str(exc_info.value).lower()
+
+    @patch("time.sleep")
+    @patch("time.time")
+    def test_wait_for_array_timeout(self, mock_time, mock_sleep):
+        """Test wait_for_array timeout."""
+        # Simulate time passing
+        mock_time.side_effect = [0, 10, 20, 30, 40]
+
+        mock_client = MagicMock()
+        mock_client.get_array_status.return_value = {
+            "job_id": 12345,
+            "total_tasks": 100,
+            "completed": 50,
+            "running": 50,
+            "pending": 0,
+            "failed": 0,
+            "state": "RUNNING",
+        }
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        with pytest.raises(SlurmAPIError) as exc_info:
+            hook.wait_for_array(12345, timeout=30, poll_interval=10)
+
+        assert "did not complete within 30 seconds" in str(exc_info.value)
+
+    def test_cancel_array_task_entire_array(self):
+        """Test cancelling entire array job."""
+        mock_client = MagicMock()
+        mock_client.cancel_array_task.return_value = {"status": "cancelled"}
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        result = hook.cancel_array_task(12345)
+
+        assert result is True
+        mock_client.cancel_array_task.assert_called_once_with(12345, None)
+
+    def test_cancel_array_task_specific_task(self):
+        """Test cancelling specific array task."""
+        mock_client = MagicMock()
+        mock_client.cancel_array_task.return_value = {"status": "cancelled"}
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        result = hook.cancel_array_task(12345, array_task_id=5)
+
+        assert result is True
+        mock_client.cancel_array_task.assert_called_once_with(12345, 5)
