@@ -19,7 +19,7 @@ class SlurmOperator(BaseOperator):
 
     This operator uses SlurmHook to submit a bash script as a Slurm job.
     It can either return immediately after submission or wait for the job
-    to complete.
+    to complete. Supports both single jobs and job arrays.
 
     Args:
         script: Bash script content to execute
@@ -37,13 +37,15 @@ class SlurmOperator(BaseOperator):
         constraint: Node constraints
         account: Slurm account
         qos: Quality of Service
+        array: Array job specification (e.g., "0-99", "1-100:2", "0-99%10")
+        array_fail_on_error: For array jobs, fail if any task fails
         wait_for_completion: If True, wait for job to complete
         poll_interval: Polling interval in seconds when waiting
         timeout: Maximum wait time in seconds
         **kwargs: Additional Slurm job parameters
 
     Returns:
-        Job ID of the submitted job (accessible via XCom)
+        Job ID of the submitted job (parent job ID for arrays, accessible via XCom)
 
     Example:
         Simple job submission:
@@ -69,6 +71,27 @@ class SlurmOperator(BaseOperator):
         ...         "OUTPUT_PATH": "/data/output",
         ...     },
         ... )
+
+        Array job submission:
+
+        >>> array_job = SlurmOperator(
+        ...     task_id="array_processing",
+        ...     script="#!/bin/bash\\necho Processing task $SLURM_ARRAY_TASK_ID",
+        ...     job_name="batch_processing",
+        ...     array="0-99",  # 100 tasks
+        ...     wait_for_completion=True,
+        ... )
+
+        Array job with limited parallelism:
+
+        >>> limited_array = SlurmOperator(
+        ...     task_id="controlled_array",
+        ...     script="#!/bin/bash\\npython process.py $SLURM_ARRAY_TASK_ID",
+        ...     job_name="controlled_processing",
+        ...     array="0-999%50",  # 1000 tasks, max 50 concurrent
+        ...     wait_for_completion=True,
+        ...     array_fail_on_error=False,  # Continue even if some tasks fail
+        ... )
     """
 
     template_fields: Sequence[str] = (
@@ -78,6 +101,7 @@ class SlurmOperator(BaseOperator):
         "stdout",
         "stderr",
         "environment",
+        "array",
     )
     template_ext: Sequence[str] = (".sh", ".bash")
     ui_color = "#f4a460"
@@ -100,6 +124,8 @@ class SlurmOperator(BaseOperator):
         constraint: Optional[str] = None,
         account: Optional[str] = None,
         qos: Optional[str] = None,
+        array: Optional[str] = None,
+        array_fail_on_error: bool = True,
         wait_for_completion: bool = False,
         poll_interval: int = 10,
         timeout: int = 3600,
@@ -122,26 +148,37 @@ class SlurmOperator(BaseOperator):
         self.constraint = constraint
         self.account = account
         self.qos = qos
+        self.array = array
+        self.array_fail_on_error = array_fail_on_error
         self.wait_for_completion = wait_for_completion
         self.poll_interval = poll_interval
         self.timeout = timeout
         self.extra_kwargs = kwargs
+        self._job_id: Optional[int] = None
 
-    def execute(self, context: Context) -> int:
+    def execute(self, context: Context) -> Dict[str, Any]:
         """Execute the operator.
 
         Args:
             context: Airflow task context
 
         Returns:
-            Slurm job ID
+            Dictionary containing:
+                - job_id: Slurm job ID (parent ID for array jobs)
+                - is_array: Boolean indicating if this is an array job
+                - array_spec: Array specification if array job
+                - array_task_count: Number of tasks if array job
+                - array_status: Final array status if waited and is array
 
         Raises:
             SlurmAPIError: If job submission or execution fails
         """
         hook = SlurmHook(slurm_conn_id=self.slurm_conn_id)
 
-        logger.info(f"Submitting Slurm job: {self.job_name}")
+        if self.array:
+            logger.info(f"Submitting Slurm array job: {self.job_name} ({self.array})")
+        else:
+            logger.info(f"Submitting Slurm job: {self.job_name}")
 
         # Submit the job
         job_id = hook.submit_job(
@@ -159,32 +196,68 @@ class SlurmOperator(BaseOperator):
             constraint=self.constraint,
             account=self.account,
             qos=self.qos,
+            array=self.array,
             **self.extra_kwargs,
         )
 
-        logger.info(f"Job submitted successfully with ID: {job_id}")
+        # Store job_id for on_kill
+        self._job_id = job_id
+
+        # Build return value
+        result: Dict[str, Any] = {
+            "job_id": job_id,
+            "is_array": bool(self.array),
+        }
+
+        if self.array:
+            result["array_spec"] = self.array
+            logger.info(
+                f"Array job submitted successfully with ID: {job_id} ({self.array})"
+            )
+        else:
+            logger.info(f"Job submitted successfully with ID: {job_id}")
 
         # Optionally wait for completion
         if self.wait_for_completion:
-            logger.info(f"Waiting for job {job_id} to complete...")
-            final_state = hook.wait_for_job(
-                job_id=job_id,
-                timeout=self.timeout,
-                poll_interval=self.poll_interval,
-            )
-            logger.info(f"Job {job_id} completed with state: {final_state}")
+            if self.array:
+                logger.info(f"Waiting for array job {job_id} to complete...")
+                array_status = hook.wait_for_array(
+                    job_id=job_id,
+                    timeout=self.timeout,
+                    poll_interval=self.poll_interval,
+                    fail_on_error=self.array_fail_on_error,
+                )
+                result["array_status"] = array_status
+                result["array_task_count"] = array_status.get("total_tasks", 0)
+                logger.info(
+                    f"Array job {job_id} completed: "
+                    f"{array_status['completed']}/{array_status['total_tasks']} tasks succeeded"
+                )
+            else:
+                logger.info(f"Waiting for job {job_id} to complete...")
+                final_state = hook.wait_for_job(
+                    job_id=job_id,
+                    timeout=self.timeout,
+                    poll_interval=self.poll_interval,
+                )
+                logger.info(f"Job {job_id} completed with state: {final_state}")
 
-        return job_id
+        return result
 
     def on_kill(self) -> None:
         """Cancel the Slurm job if task is killed."""
-        if hasattr(self, "_job_id") and self._job_id:
+        if self._job_id:
+            job_type = "array job" if self.array else "job"
             logger.warning(
-                f"Task killed - attempting to cancel Slurm job {self._job_id}"
+                f"Task killed - attempting to cancel Slurm {job_type} {self._job_id}"
             )
             try:
                 hook = SlurmHook(slurm_conn_id=self.slurm_conn_id)
-                hook.cancel_job(self._job_id)
-                logger.info(f"Successfully cancelled job {self._job_id}")
+                if self.array:
+                    # Cancel entire array job
+                    hook.cancel_array_task(self._job_id)
+                else:
+                    hook.cancel_job(self._job_id)
+                logger.info(f"Successfully cancelled {job_type} {self._job_id}")
             except Exception as e:
-                logger.error(f"Failed to cancel job {self._job_id}: {e}")
+                logger.error(f"Failed to cancel {job_type} {self._job_id}: {e}")
