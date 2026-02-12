@@ -589,3 +589,242 @@ exit 1
                 logger.info(f"Final job state: {state}")
                 # Job should have failed
                 assert state in ["FAILED", "COMPLETED"]
+
+    # Array job tests
+
+    def test_hook_submit_array_job_basic(self, slurm_hook, mock_airflow_connection):
+        """Test submitting a basic array job."""
+        script = """#!/bin/bash
+echo "Array task ID: $SLURM_ARRAY_TASK_ID"
+echo "Array job ID: $SLURM_ARRAY_JOB_ID"
+sleep 1
+"""
+
+        job_id = slurm_hook.submit_job(
+            script=script,
+            job_name="array-test-basic",
+            partition="debug",
+            cpus_per_task=1,
+            mem="100M",
+            time_limit="00:01:00",
+            array="0-9",  # 10 tasks
+        )
+
+        logger.info(f"Submitted array job {job_id}")
+        assert job_id > 0
+
+        # Give jobs time to start
+        time.sleep(2)
+
+        # Check array status
+        status = slurm_hook.get_array_status(job_id)
+        logger.info(f"Array status: {status}")
+
+        assert status["job_id"] == job_id
+        assert status["total_tasks"] == 10
+
+        # Wait for completion
+        final_status = slurm_hook.wait_for_array(job_id, timeout=60, poll_interval=2)
+
+        logger.info(f"Final array status: {final_status}")
+        assert final_status["state"] == "COMPLETED"
+        assert final_status["completed"] == 10
+        assert final_status["failed"] == 0
+
+    def test_hook_array_with_step(self, slurm_hook, mock_airflow_connection):
+        """Test array job with step specification."""
+        script = """#!/bin/bash
+echo "Task $SLURM_ARRAY_TASK_ID"
+"""
+
+        job_id = slurm_hook.submit_job(
+            script=script,
+            job_name="array-step-test",
+            partition="debug",
+            cpus_per_task=1,
+            mem="100M",
+            time_limit="00:01:00",
+            array="0-20:5",  # Tasks 0, 5, 10, 15, 20 (5 tasks)
+        )
+
+        logger.info(f"Submitted array job with step: {job_id}")
+
+        # Wait for completion
+        final_status = slurm_hook.wait_for_array(job_id, timeout=60, poll_interval=2)
+
+        logger.info(f"Final status: {final_status}")
+        assert final_status["state"] == "COMPLETED"
+        assert final_status["completed"] == 5
+
+    def test_hook_array_with_parallelism_limit(
+        self, slurm_hook, mock_airflow_connection
+    ):
+        """Test array job with parallelism limit."""
+        script = """#!/bin/bash
+echo "Task $SLURM_ARRAY_TASK_ID"
+sleep 1
+"""
+
+        job_id = slurm_hook.submit_job(
+            script=script,
+            job_name="array-limited-test",
+            partition="debug",
+            cpus_per_task=1,
+            mem="100M",
+            time_limit="00:02:00",
+            array="0-19%5",  # 20 tasks, max 5 concurrent
+        )
+
+        logger.info(f"Submitted array job with parallelism limit: {job_id}")
+
+        # Check that some tasks are running, some pending
+        time.sleep(2)
+        status = slurm_hook.get_array_status(job_id)
+        logger.info(f"Array status during execution: {status}")
+
+        # With limit of 5, we shouldn't have more than 5 running at once
+        # (Though this is best-effort depending on cluster state)
+        assert status["total_tasks"] == 20
+
+        # Wait for completion
+        final_status = slurm_hook.wait_for_array(job_id, timeout=120, poll_interval=3)
+
+        assert final_status["state"] == "COMPLETED"
+        assert final_status["completed"] == 20
+
+    def test_hook_array_with_partial_failures(
+        self, slurm_hook, mock_airflow_connection
+    ):
+        """Test array job where some tasks fail."""
+        script = """#!/bin/bash
+# Fail tasks 3 and 7
+if [ $SLURM_ARRAY_TASK_ID -eq 3 ] || [ $SLURM_ARRAY_TASK_ID -eq 7 ]; then
+    echo "Failing task $SLURM_ARRAY_TASK_ID"
+    exit 1
+fi
+echo "Success task $SLURM_ARRAY_TASK_ID"
+exit 0
+"""
+
+        job_id = slurm_hook.submit_job(
+            script=script,
+            job_name="array-partial-fail",
+            partition="debug",
+            cpus_per_task=1,
+            mem="100M",
+            time_limit="00:01:00",
+            array="0-9",  # 10 tasks, 2 will fail
+        )
+
+        logger.info(f"Submitted array job with partial failures: {job_id}")
+
+        # Wait with fail_on_error=False to allow partial completion
+        final_status = slurm_hook.wait_for_array(
+            job_id, timeout=60, poll_interval=2, fail_on_error=False
+        )
+
+        logger.info(f"Final status: {final_status}")
+        assert final_status["state"] == "PARTIALLY_COMPLETED"
+        assert final_status["completed"] == 8
+        assert final_status["failed"] == 2
+
+    def test_hook_cancel_array_job(self, slurm_hook, mock_airflow_connection):
+        """Test cancelling an array job."""
+        script = """#!/bin/bash
+echo "Task $SLURM_ARRAY_TASK_ID"
+sleep 30
+"""
+
+        job_id = slurm_hook.submit_job(
+            script=script,
+            job_name="array-cancel-test",
+            partition="debug",
+            cpus_per_task=1,
+            mem="100M",
+            time_limit="00:05:00",
+            array="0-9",
+        )
+
+        logger.info(f"Submitted array job for cancellation: {job_id}")
+
+        # Give it time to start
+        time.sleep(2)
+
+        # Cancel the entire array
+        result = slurm_hook.cancel_array_task(job_id)
+        assert result is True
+
+        logger.info(f"Cancelled array job {job_id}")
+
+        # Check status after cancellation
+        time.sleep(2)
+        status = slurm_hook.get_array_status(job_id)
+        logger.info(f"Status after cancellation: {status}")
+
+        # Most or all tasks should be cancelled
+        # State could be CANCELLED or FAILED depending on timing
+        assert status["state"] in ["CANCELLED", "FAILED", "PARTIALLY_COMPLETED"]
+
+    def test_operator_array_job_basic(self, mock_airflow_connection):
+        """Test SlurmOperator with array job."""
+        script = """#!/bin/bash
+echo "Array task $SLURM_ARRAY_TASK_ID"
+"""
+
+        operator = SlurmOperator(
+            task_id="test_array_operator",
+            script=script,
+            job_name="operator-array-test",
+            slurm_conn_id="slurm_default",
+            partition="debug",
+            cpus_per_task=1,
+            mem="100M",
+            time_limit="00:01:00",
+            array="0-4",  # 5 tasks
+            wait_for_completion=True,
+        )
+
+        mock_context = {}
+        result = operator.execute(mock_context)
+
+        logger.info(f"Operator result: {result}")
+
+        # Check result structure
+        assert result["job_id"] > 0
+        assert result["is_array"] is True
+        assert result["array_spec"] == "0-4"
+        assert result["array_status"]["state"] == "COMPLETED"
+        assert result["array_status"]["total_tasks"] == 5
+
+    def test_operator_array_job_with_failure(self, mock_airflow_connection):
+        """Test SlurmOperator array job with task failures."""
+        script = """#!/bin/bash
+# Fail task 2
+if [ $SLURM_ARRAY_TASK_ID -eq 2 ]; then
+    exit 1
+fi
+"""
+
+        operator = SlurmOperator(
+            task_id="test_array_operator_fail",
+            script=script,
+            job_name="operator-array-fail",
+            slurm_conn_id="slurm_default",
+            partition="debug",
+            cpus_per_task=1,
+            mem="100M",
+            time_limit="00:01:00",
+            array="0-4",
+            wait_for_completion=True,
+            array_fail_on_error=False,  # Don't fail on partial completion
+        )
+
+        mock_context = {}
+        result = operator.execute(mock_context)
+
+        logger.info(f"Operator result with failures: {result}")
+
+        # Should complete with partial success
+        assert result["array_status"]["state"] == "PARTIALLY_COMPLETED"
+        assert result["array_status"]["completed"] == 4
+        assert result["array_status"]["failed"] == 1
