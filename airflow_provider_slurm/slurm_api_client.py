@@ -252,23 +252,119 @@ class SlurmAPIClient:
         else:
             return 1
 
+    @staticmethod
+    def validate_dependency(dependency: str) -> Tuple[bool, Optional[str]]:
+        """Validate Slurm job dependency specification.
+
+        Args:
+            dependency: Dependency specification string
+
+        Returns:
+            Tuple of (is_valid, error_message)
+
+        Valid formats:
+            - after:job_id[+time]
+            - afterok:job_id[:job_id...]
+            - afternotok:job_id[:job_id...]
+            - afterany:job_id[:job_id...]
+            - aftercorr:job_id
+            - singleton
+            - afterburstbuffer:job_id
+            - Combinations with , (AND) or ? (OR)
+
+        Examples:
+            >>> validate_dependency("afterok:12345")
+            (True, None)
+
+            >>> validate_dependency("afterok:12345:12346")
+            (True, None)
+
+            >>> validate_dependency("afterok:12345,afterany:12346")
+            (True, None)
+
+            >>> validate_dependency("afterok:12345?afternotok:12346")
+            (True, None)
+
+            >>> validate_dependency("invalid:abc")
+            (False, "Invalid dependency type 'invalid'")
+        """
+        if not dependency or not isinstance(dependency, str):
+            return False, "Dependency must be a non-empty string"
+
+        # Remove whitespace
+        dep = dependency.strip()
+
+        if not dep:
+            return False, "Empty dependency specification"
+
+        # Define valid dependency type patterns
+        patterns = {
+            "after": r"after:\d+(?:\+\d+)?",  # after:job_id or after:job_id+time
+            "afterok": r"afterok:\d+(?::\d+)*",  # afterok:job_id[:job_id...]
+            "afternotok": r"afternotok:\d+(?::\d+)*",
+            "afterany": r"afterany:\d+(?::\d+)*",
+            "aftercorr": r"aftercorr:\d+",  # aftercorr:job_id (single job)
+            "singleton": r"singleton",
+            "afterburstbuffer": r"afterburstbuffer:\d+",
+        }
+
+        # Build combined pattern for a single dependency clause
+        single_patterns = "|".join(f"(?:{p})" for p in patterns.values())
+        single_clause_pattern = f"^({single_patterns})$"
+
+        # Pattern for full dependency string with combinators
+        # Allows: dep1,dep2 (AND) or dep1?dep2 (OR)
+        full_pattern = f"^({single_patterns})(?:[,?]({single_patterns}))*$"
+
+        # Check if it matches the full pattern
+        if re.match(full_pattern, dep):
+            # Extract individual clauses to validate each
+            clauses = re.split(r"[,?]", dep)
+            for clause in clauses:
+                if not re.match(single_clause_pattern, clause):
+                    # Try to identify the dependency type
+                    dep_type = clause.split(":")[0] if ":" in clause else clause
+                    if dep_type not in patterns:
+                        return (
+                            False,
+                            f"Invalid dependency type '{dep_type}'. "
+                            f"Valid types: {', '.join(patterns.keys())}",
+                        )
+                    return False, f"Invalid format for dependency clause '{clause}'"
+
+            return True, None
+
+        # If we get here, the format is invalid
+        return (
+            False,
+            f"Invalid dependency specification '{dep}'. "
+            "Valid formats: 'afterok:job_id', 'afterok:job1:job2', "
+            "'afterok:job1,afterany:job2', 'singleton'",
+        )
+
     def submit_job(
-        self, job_spec: Dict[str, Any], array: Optional[str] = None
+        self,
+        job_spec: Dict[str, Any],
+        array: Optional[str] = None,
+        dependency: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Submit a job to Slurm.
 
         Args:
             job_spec: Job specification dictionary with 'script' and 'job' keys
             array: Optional array specification (e.g., "0-99", "1-100:2", "1,5,10")
+            dependency: Optional dependency specification (e.g., "afterok:12345")
 
         Returns:
             Response dictionary containing:
                 - job_id: Parent job ID
                 - array: Array specification (if array job)
                 - array_task_count: Number of array tasks (if array job)
+                - dependency: Dependency specification (if dependency set)
 
         Raises:
-            SlurmAPIError: If job submission fails or array spec is invalid
+            SlurmAPIError: If job submission fails, array spec is invalid,
+                          or dependency spec is invalid
 
         Examples:
             >>> # Submit single job
@@ -278,6 +374,14 @@ class SlurmAPIClient:
             >>> # Submit array job
             >>> client.submit_job(job_spec, array="0-99")
             {'job_id': 12345, 'array': '0-99', 'array_task_count': 100}
+
+            >>> # Submit job with dependency
+            >>> client.submit_job(job_spec, dependency="afterok:12345")
+            {'job_id': 12346, 'dependency': 'afterok:12345'}
+
+            >>> # Submit array job with dependency
+            >>> client.submit_job(job_spec, array="0-99", dependency="afterok:12345")
+            {'job_id': 12346, 'array': '0-99', 'array_task_count': 100, 'dependency': 'afterok:12345'}
         """
         # Validate array specification if provided
         if array:
@@ -290,6 +394,18 @@ class SlurmAPIClient:
                 job_spec["job"] = {}
             job_spec["job"]["array"] = array
             logger.info(f"Submitting array job with spec: {array}")
+
+        # Validate dependency specification if provided
+        if dependency:
+            is_valid, error_msg = self.validate_dependency(dependency)
+            if not is_valid:
+                raise SlurmAPIError(f"Invalid dependency specification: {error_msg}")
+
+            # Add dependency to job spec
+            if "job" not in job_spec:
+                job_spec["job"] = {}
+            job_spec["job"]["dependency"] = dependency
+            logger.info(f"Submitting job with dependency: {dependency}")
 
         endpoint = f"/slurm/{self.api_version}/job/submit"
 
@@ -315,12 +431,23 @@ class SlurmAPIClient:
         if array:
             result["array"] = array
             result["array_task_count"] = self.parse_array_spec(array)
-            logger.info(
-                f"Successfully submitted array job {job_id} "
-                f"with {result['array_task_count']} tasks"
+
+        # Enrich response with dependency information
+        if dependency:
+            result["dependency"] = dependency
+
+        # Build success log message
+        log_parts = [f"Successfully submitted"]
+        if array:
+            log_parts.append(
+                f"array job {job_id} with {result['array_task_count']} tasks"
             )
         else:
-            logger.info(f"Successfully submitted job {job_id}")
+            log_parts.append(f"job {job_id}")
+        if dependency:
+            log_parts.append(f"(dependency: {dependency})")
+
+        logger.info(" ".join(log_parts))
 
         return result  # type: ignore[no-any-return]
 
