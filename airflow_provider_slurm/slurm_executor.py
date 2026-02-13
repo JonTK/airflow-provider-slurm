@@ -197,29 +197,36 @@ class SlurmExecutor(BaseExecutor):
             queue: Airflow queue (can map to Slurm partition)
             executor_config: Task-specific Slurm configuration
                 - array: Array specification (e.g., "0-99", "1-100:2")
+                - dependency: Dependency specification (e.g., "afterok:12345")
                 - All other standard Slurm parameters
         """
         try:
             config = executor_config or {}
             array_spec = config.get("array")
+            dependency_spec = config.get("dependency")
 
+            # Build log message
+            log_parts = [f"Submitting task {key} to Slurm"]
             if array_spec:
-                logger.info(
-                    f"Submitting task {key} to Slurm as array job: {array_spec}"
-                )
-            else:
-                logger.info(f"Submitting task {key} to Slurm")
+                log_parts.append(f"(array: {array_spec})")
+            if dependency_spec:
+                log_parts.append(f"(dependency: {dependency_spec})")
+            logger.info(" ".join(log_parts))
 
             # Build job specification
-            job_spec, array = self._build_job_spec(key, command, queue, executor_config)
+            job_spec, array, dependency = self._build_job_spec(
+                key, command, queue, executor_config
+            )
 
             # Submit to Slurm
             assert self.slurm_client is not None, "Executor not started"
-            result = self.slurm_client.submit_job(job_spec, array=array)
+            result = self.slurm_client.submit_job(
+                job_spec, array=array, dependency=dependency
+            )
             job_id = result.get("job_id")
 
             if job_id:
-                # Track the job with array metadata
+                # Track the job with array and dependency metadata
                 job_metadata: Dict[str, Any] = {
                     "slurm_job_id": job_id,
                     "command": command,
@@ -231,13 +238,25 @@ class SlurmExecutor(BaseExecutor):
                     job_metadata["array_spec"] = array
                     job_metadata["array_task_count"] = result.get("array_task_count", 0)
                     job_metadata["is_array"] = True
-                    logger.info(
-                        f"Task {key} submitted as Slurm array job {job_id} "
-                        f"({job_metadata['array_task_count']} tasks)"
-                    )
                 else:
                     job_metadata["is_array"] = False
-                    logger.info(f"Task {key} submitted as Slurm job {job_id}")
+
+                # Store dependency information if specified
+                if dependency:
+                    job_metadata["dependency"] = dependency
+
+                # Build success log message
+                success_parts = [f"Task {key} submitted as Slurm"]
+                if array:
+                    success_parts.append(
+                        f"array job {job_id} ({job_metadata['array_task_count']} tasks)"
+                    )
+                else:
+                    success_parts.append(f"job {job_id}")
+                if dependency:
+                    success_parts.append(f"(dependency: {dependency})")
+
+                logger.info(" ".join(success_parts))
 
                 self.running[key] = job_metadata
             else:
@@ -253,7 +272,7 @@ class SlurmExecutor(BaseExecutor):
         command: Sequence[str],
         queue: Optional[str],
         executor_config: Optional[Dict[str, Any]],
-    ) -> tuple[Dict[str, Any], Optional[str]]:
+    ) -> tuple[Dict[str, Any], Optional[str], Optional[str]]:
         """Build Slurm job specification for a task.
 
         Args:
@@ -263,12 +282,13 @@ class SlurmExecutor(BaseExecutor):
             executor_config: Task-specific configuration
 
         Returns:
-            Tuple of (job_spec_dict, array_spec_or_none)
+            Tuple of (job_spec_dict, array_spec_or_none, dependency_spec_or_none)
         """
         config = executor_config or {}
 
-        # Extract array parameter (don't include in job params)
+        # Extract array and dependency parameters (don't include in job params)
         array_spec = config.get("array")
+        dependency_spec = config.get("dependency")
 
         # Build job name
         job_name = self._build_job_name(key)
@@ -320,7 +340,7 @@ class SlurmExecutor(BaseExecutor):
             "job": job_params,
         }
 
-        return job_spec, array_spec
+        return job_spec, array_spec, dependency_spec
 
     def _build_job_name(self, key: TaskInstanceKey) -> str:
         """Build Slurm job name that encodes task identity.
@@ -514,10 +534,17 @@ class SlurmExecutor(BaseExecutor):
             "NODE_FAIL",
             "OUT_OF_MEMORY",
             "PREEMPTED",
+            "DEPENDENCY_NEVER_SATISFIED",
         ]:
             reason = job_data.get("state_reason", "unknown")
             self.fail(key)
-            logger.error(f"Task {key} failed: {state} - {reason}")
+            if state == "DEPENDENCY_NEVER_SATISFIED":
+                logger.error(
+                    f"Task {key} failed: dependency not satisfied "
+                    f"(dependent job may have failed) - {reason}"
+                )
+            else:
+                logger.error(f"Task {key} failed: {state} - {reason}")
             del self.running[key]
             return
 
