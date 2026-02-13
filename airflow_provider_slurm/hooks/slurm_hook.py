@@ -177,6 +177,7 @@ class SlurmHook(BaseHook):
         account: Optional[str] = None,
         qos: Optional[str] = None,
         array: Optional[str] = None,
+        dependency: Optional[str] = None,
         **kwargs: Any,
     ) -> int:
         """Submit a job to Slurm.
@@ -197,6 +198,7 @@ class SlurmHook(BaseHook):
             account: Slurm account
             qos: Quality of Service
             array: Array specification (e.g., "0-99", "1-100:2", "0-99%10")
+            dependency: Dependency specification (e.g., "afterok:12345")
             **kwargs: Additional job parameters
 
         Returns:
@@ -217,6 +219,31 @@ class SlurmHook(BaseHook):
             ...     array="0-99"
             ... )
             12346  # Parent job ID
+
+            >>> # Submit job with dependency
+            >>> hook.submit_job(
+            ...     script="#!/bin/bash\\necho 'dependent job'",
+            ...     job_name="dependent_job",
+            ...     dependency="afterok:12345"
+            ... )
+            12347
+
+            >>> # Submit job with multiple dependencies (AND logic)
+            >>> hook.submit_job(
+            ...     script="#!/bin/bash\\necho 'merge job'",
+            ...     job_name="merge_job",
+            ...     dependency="afterok:12345:12346"
+            ... )
+            12348
+
+            >>> # Submit array job with dependency
+            >>> hook.submit_job(
+            ...     script="#!/bin/bash\\necho $SLURM_ARRAY_TASK_ID",
+            ...     job_name="dependent_array",
+            ...     array="0-99",
+            ...     dependency="afterok:12347"
+            ... )
+            12349
         """
         client = self.get_conn()
 
@@ -257,23 +284,34 @@ class SlurmHook(BaseHook):
             "job": job_params,
         }
 
-        logger.info(
-            f"Submitting job {job_name} to Slurm"
-            + (f" (array: {array})" if array else "")
-        )
-        result = client.submit_job(job_spec, array=array)
+        # Build log message
+        log_parts = [f"Submitting job {job_name} to Slurm"]
+        if array:
+            log_parts.append(f"(array: {array})")
+        if dependency:
+            log_parts.append(f"(dependency: {dependency})")
+        logger.info(" ".join(log_parts))
+
+        result = client.submit_job(job_spec, array=array, dependency=dependency)
 
         job_id = result.get("job_id")
         if not job_id:
             raise SlurmAPIError(f"No job_id returned for job {job_name}")
 
+        # Build success log message
+        success_parts = []
         if array:
             task_count = result.get("array_task_count", "unknown")
-            logger.info(
+            success_parts.append(
                 f"Array job {job_name} submitted with ID {job_id} ({task_count} tasks)"
             )
         else:
-            logger.info(f"Job {job_name} submitted with ID {job_id}")
+            success_parts.append(f"Job {job_name} submitted with ID {job_id}")
+
+        if dependency:
+            success_parts.append(f"(dependency: {dependency})")
+
+        logger.info(" ".join(success_parts))
 
         return int(job_id)
 
