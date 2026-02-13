@@ -39,6 +39,7 @@ class SlurmOperator(BaseOperator):
         qos: Quality of Service
         array: Array job specification (e.g., "0-99", "1-100:2", "0-99%10")
         array_fail_on_error: For array jobs, fail if any task fails
+        dependency: Dependency specification (e.g., "afterok:12345") - templatable
         wait_for_completion: If True, wait for job to complete
         poll_interval: Polling interval in seconds when waiting
         timeout: Maximum wait time in seconds
@@ -92,6 +93,39 @@ class SlurmOperator(BaseOperator):
         ...     wait_for_completion=True,
         ...     array_fail_on_error=False,  # Continue even if some tasks fail
         ... )
+
+        Job with dependency (using XCom):
+
+        >>> @task
+        ... def submit_preprocessing():
+        ...     op = SlurmOperator(
+        ...         task_id="preprocess",
+        ...         script="#!/bin/bash\\npython preprocess.py",
+        ...         job_name="preprocessing"
+        ...     )
+        ...     return op.execute({})["job_id"]
+        ...
+        >>> @task
+        ... def submit_analysis(preproc_job_id):
+        ...     op = SlurmOperator(
+        ...         task_id="analysis",
+        ...         script="#!/bin/bash\\npython analyze.py",
+        ...         job_name="analysis",
+        ...         dependency=f"afterok:{preproc_job_id}"  # Wait for preprocessing
+        ...     )
+        ...     return op.execute({})
+        ...
+        >>> preproc = submit_preprocessing()
+        >>> analysis = submit_analysis(preproc)
+
+        Job with templatable dependency:
+
+        >>> dependent_job = SlurmOperator(
+        ...     task_id="dependent_task",
+        ...     script="#!/bin/bash\\necho 'Running after job completes'",
+        ...     job_name="dependent_job",
+        ...     dependency="afterok:{{ task_instance.xcom_pull('previous_task') }}",
+        ... )
     """
 
     template_fields: Sequence[str] = (
@@ -102,6 +136,7 @@ class SlurmOperator(BaseOperator):
         "stderr",
         "environment",
         "array",
+        "dependency",
     )
     template_ext: Sequence[str] = (".sh", ".bash")
     ui_color = "#f4a460"
@@ -126,6 +161,7 @@ class SlurmOperator(BaseOperator):
         qos: Optional[str] = None,
         array: Optional[str] = None,
         array_fail_on_error: bool = True,
+        dependency: Optional[str] = None,
         wait_for_completion: bool = False,
         poll_interval: int = 10,
         timeout: int = 3600,
@@ -150,6 +186,7 @@ class SlurmOperator(BaseOperator):
         self.qos = qos
         self.array = array
         self.array_fail_on_error = array_fail_on_error
+        self.dependency = dependency
         self.wait_for_completion = wait_for_completion
         self.poll_interval = poll_interval
         self.timeout = timeout
@@ -175,10 +212,15 @@ class SlurmOperator(BaseOperator):
         """
         hook = SlurmHook(slurm_conn_id=self.slurm_conn_id)
 
+        # Build submission log message
+        log_parts = [f"Submitting Slurm"]
         if self.array:
-            logger.info(f"Submitting Slurm array job: {self.job_name} ({self.array})")
+            log_parts.append(f"array job: {self.job_name} ({self.array})")
         else:
-            logger.info(f"Submitting Slurm job: {self.job_name}")
+            log_parts.append(f"job: {self.job_name}")
+        if self.dependency:
+            log_parts.append(f"with dependency: {self.dependency}")
+        logger.info(" ".join(log_parts))
 
         # Submit the job
         job_id = hook.submit_job(
@@ -197,6 +239,7 @@ class SlurmOperator(BaseOperator):
             account=self.account,
             qos=self.qos,
             array=self.array,
+            dependency=self.dependency,
             **self.extra_kwargs,
         )
 
@@ -211,11 +254,20 @@ class SlurmOperator(BaseOperator):
 
         if self.array:
             result["array_spec"] = self.array
-            logger.info(
+        if self.dependency:
+            result["dependency"] = self.dependency
+
+        # Build success log message
+        success_parts = []
+        if self.array:
+            success_parts.append(
                 f"Array job submitted successfully with ID: {job_id} ({self.array})"
             )
         else:
-            logger.info(f"Job submitted successfully with ID: {job_id}")
+            success_parts.append(f"Job submitted successfully with ID: {job_id}")
+        if self.dependency:
+            success_parts.append(f"(dependency: {self.dependency})")
+        logger.info(" ".join(success_parts))
 
         # Optionally wait for completion
         if self.wait_for_completion:
