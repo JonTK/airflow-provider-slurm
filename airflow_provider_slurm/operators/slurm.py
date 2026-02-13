@@ -39,6 +39,7 @@ class SlurmOperator(BaseOperator):
         qos: Quality of Service
         nodes: Number of nodes to allocate (Slurm -N flag)
         ntasks_per_node: Number of tasks per node (Slurm --ntasks-per-node flag)
+        exclusive: Allocate nodes exclusively (Slurm --exclusive flag)
         array: Array job specification (e.g., "0-99", "1-100:2", "0-99%10")
         array_fail_on_error: For array jobs, fail if any task fails
         dependency: Dependency specification (e.g., "afterok:12345") - templatable
@@ -141,6 +142,17 @@ class SlurmOperator(BaseOperator):
         ...     mem="32G",  # Memory per node
         ...     time_limit="04:00:00",
         ... )
+
+        Exclusive node allocation (no sharing with other jobs):
+
+        >>> exclusive_job = SlurmOperator(
+        ...     task_id="exclusive_workload",
+        ...     script="#!/bin/bash\\n./intensive_computation",
+        ...     job_name="exclusive",
+        ...     nodes=2,
+        ...     exclusive=True,  # Allocate nodes exclusively
+        ...     time_limit="02:00:00",
+        ... )
     """
 
     template_fields: Sequence[str] = (
@@ -176,6 +188,7 @@ class SlurmOperator(BaseOperator):
         qos: Optional[str] = None,
         nodes: Optional[int] = None,
         ntasks_per_node: Optional[int] = None,
+        exclusive: bool = False,
         array: Optional[str] = None,
         array_fail_on_error: bool = True,
         dependency: Optional[str] = None,
@@ -203,6 +216,7 @@ class SlurmOperator(BaseOperator):
         self.qos = qos
         self.nodes = nodes
         self.ntasks_per_node = ntasks_per_node
+        self.exclusive = exclusive
         self.array = array
         self.array_fail_on_error = array_fail_on_error
         self.dependency = dependency
@@ -259,6 +273,7 @@ class SlurmOperator(BaseOperator):
             qos=self.qos,
             nodes=self.nodes,
             ntasks_per_node=self.ntasks_per_node,
+            exclusive=self.exclusive,
             array=self.array,
             dependency=self.dependency,
             **self.extra_kwargs,

@@ -178,6 +178,7 @@ class SlurmHook(BaseHook):
         qos: Optional[str] = None,
         nodes: Optional[int] = None,
         ntasks_per_node: Optional[int] = None,
+        exclusive: bool = False,
         array: Optional[str] = None,
         dependency: Optional[str] = None,
         **kwargs: Any,
@@ -201,6 +202,7 @@ class SlurmHook(BaseHook):
             qos: Quality of Service
             nodes: Number of nodes to allocate (Slurm -N flag)
             ntasks_per_node: Number of tasks per node (Slurm --ntasks-per-node flag)
+            exclusive: Allocate nodes exclusively (Slurm --exclusive flag)
             array: Array specification (e.g., "0-99", "1-100:2", "0-99%10")
             dependency: Dependency specification (e.g., "afterok:12345")
             **kwargs: Additional job parameters
@@ -283,6 +285,8 @@ class SlurmHook(BaseHook):
             job_params["nodes"] = nodes
         if ntasks_per_node is not None:
             job_params["ntasks_per_node"] = ntasks_per_node
+        if exclusive:
+            job_params["exclusive"] = True
 
         # Add any additional parameters
         job_params.update(kwargs)

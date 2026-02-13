@@ -343,6 +343,10 @@ class SlurmExecutor(BaseExecutor):
         if config.get("ntasks_per_node") is not None:
             job_params["ntasks_per_node"] = config["ntasks_per_node"]
 
+        # Exclusive allocation
+        if config.get("exclusive"):
+            job_params["exclusive"] = True
+
         job_spec = {
             "script": script,
             "job": job_params,
