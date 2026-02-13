@@ -40,6 +40,7 @@ class SlurmOperator(BaseOperator):
         nodes: Number of nodes to allocate (Slurm -N flag)
         ntasks_per_node: Number of tasks per node (Slurm --ntasks-per-node flag)
         exclusive: Allocate nodes exclusively (Slurm --exclusive flag)
+        nodelist: Specific nodes to target (Slurm --nodelist flag, e.g., "node[01-04]", "gpu001,gpu002")
         array: Array job specification (e.g., "0-99", "1-100:2", "0-99%10")
         array_fail_on_error: For array jobs, fail if any task fails
         dependency: Dependency specification (e.g., "afterok:12345") - templatable
@@ -153,6 +154,17 @@ class SlurmOperator(BaseOperator):
         ...     exclusive=True,  # Allocate nodes exclusively
         ...     time_limit="02:00:00",
         ... )
+
+        Target specific nodes (for GPU jobs, debugging, or specific hardware):
+
+        >>> specific_nodes = SlurmOperator(
+        ...     task_id="gpu_training",
+        ...     script="#!/bin/bash\\npython train_on_v100.py",
+        ...     job_name="v100_training",
+        ...     nodelist="gpu[001-004]",  # Only run on gpu001, gpu002, gpu003, gpu004
+        ...     gres="gpu:v100:2",  # Request V100 GPUs
+        ...     time_limit="08:00:00",
+        ... )
     """
 
     template_fields: Sequence[str] = (
@@ -189,6 +201,7 @@ class SlurmOperator(BaseOperator):
         nodes: Optional[int] = None,
         ntasks_per_node: Optional[int] = None,
         exclusive: bool = False,
+        nodelist: Optional[str] = None,
         array: Optional[str] = None,
         array_fail_on_error: bool = True,
         dependency: Optional[str] = None,
@@ -217,6 +230,7 @@ class SlurmOperator(BaseOperator):
         self.nodes = nodes
         self.ntasks_per_node = ntasks_per_node
         self.exclusive = exclusive
+        self.nodelist = nodelist
         self.array = array
         self.array_fail_on_error = array_fail_on_error
         self.dependency = dependency
@@ -274,6 +288,7 @@ class SlurmOperator(BaseOperator):
             nodes=self.nodes,
             ntasks_per_node=self.ntasks_per_node,
             exclusive=self.exclusive,
+            nodelist=self.nodelist,
             array=self.array,
             dependency=self.dependency,
             **self.extra_kwargs,

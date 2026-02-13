@@ -347,6 +347,10 @@ class SlurmExecutor(BaseExecutor):
         if config.get("exclusive"):
             job_params["exclusive"] = True
 
+        # Node list specification
+        if config.get("nodelist"):
+            job_params["nodelist"] = config["nodelist"]
+
         job_spec = {
             "script": script,
             "job": job_params,
