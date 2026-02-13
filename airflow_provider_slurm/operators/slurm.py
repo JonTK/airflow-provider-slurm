@@ -37,6 +37,8 @@ class SlurmOperator(BaseOperator):
         constraint: Node constraints
         account: Slurm account
         qos: Quality of Service
+        nodes: Number of nodes to allocate (Slurm -N flag)
+        ntasks_per_node: Number of tasks per node (Slurm --ntasks-per-node flag)
         array: Array job specification (e.g., "0-99", "1-100:2", "0-99%10")
         array_fail_on_error: For array jobs, fail if any task fails
         dependency: Dependency specification (e.g., "afterok:12345") - templatable
@@ -126,6 +128,19 @@ class SlurmOperator(BaseOperator):
         ...     job_name="dependent_job",
         ...     dependency="afterok:{{ task_instance.xcom_pull('previous_task') }}",
         ... )
+
+        Multi-node parallel job:
+
+        >>> mpi_job = SlurmOperator(
+        ...     task_id="mpi_simulation",
+        ...     script="#!/bin/bash\\nmpirun -np 64 ./simulate",
+        ...     job_name="mpi_parallel",
+        ...     nodes=4,  # Allocate 4 nodes
+        ...     ntasks_per_node=16,  # 16 tasks per node = 64 total tasks
+        ...     cpus_per_task=2,  # 2 CPUs per task
+        ...     mem="32G",  # Memory per node
+        ...     time_limit="04:00:00",
+        ... )
     """
 
     template_fields: Sequence[str] = (
@@ -159,6 +174,8 @@ class SlurmOperator(BaseOperator):
         constraint: Optional[str] = None,
         account: Optional[str] = None,
         qos: Optional[str] = None,
+        nodes: Optional[int] = None,
+        ntasks_per_node: Optional[int] = None,
         array: Optional[str] = None,
         array_fail_on_error: bool = True,
         dependency: Optional[str] = None,
@@ -184,6 +201,8 @@ class SlurmOperator(BaseOperator):
         self.constraint = constraint
         self.account = account
         self.qos = qos
+        self.nodes = nodes
+        self.ntasks_per_node = ntasks_per_node
         self.array = array
         self.array_fail_on_error = array_fail_on_error
         self.dependency = dependency
@@ -238,6 +257,8 @@ class SlurmOperator(BaseOperator):
             constraint=self.constraint,
             account=self.account,
             qos=self.qos,
+            nodes=self.nodes,
+            ntasks_per_node=self.ntasks_per_node,
             array=self.array,
             dependency=self.dependency,
             **self.extra_kwargs,

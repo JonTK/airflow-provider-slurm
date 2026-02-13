@@ -335,6 +335,14 @@ class SlurmExecutor(BaseExecutor):
         if config.get("constraint"):
             job_params["constraints"] = config["constraint"]
 
+        # Node allocation
+        if config.get("nodes") is not None:
+            job_params["nodes"] = config["nodes"]
+
+        # Tasks per node
+        if config.get("ntasks_per_node") is not None:
+            job_params["ntasks_per_node"] = config["ntasks_per_node"]
+
         job_spec = {
             "script": script,
             "job": job_params,
