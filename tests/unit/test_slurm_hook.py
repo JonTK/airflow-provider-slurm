@@ -607,3 +607,264 @@ class TestSlurmHook:
 
         assert result is True
         mock_client.cancel_array_task.assert_called_once_with(12345, 5)
+
+    # Job dependency tests
+
+    def test_submit_job_with_dependency_afterok(self):
+        """Test submitting job with afterok dependency."""
+        mock_client = MagicMock()
+        mock_client.submit_job.return_value = {
+            "job_id": 12346,
+            "dependency": "afterok:12345",
+        }
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        job_id = hook.submit_job(
+            script="#!/bin/bash\necho 'dependent job'",
+            job_name="dependent_job",
+            dependency="afterok:12345",
+        )
+
+        assert job_id == 12346
+        mock_client.submit_job.assert_called_once()
+        call_args = mock_client.submit_job.call_args
+
+        # Verify dependency parameter was passed
+        assert call_args[1]["dependency"] == "afterok:12345"
+
+    def test_submit_job_with_dependency_afterany(self):
+        """Test submitting job with afterany dependency."""
+        mock_client = MagicMock()
+        mock_client.submit_job.return_value = {
+            "job_id": 12347,
+            "dependency": "afterany:12345:12346",
+        }
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        job_id = hook.submit_job(
+            script="#!/bin/bash\necho 'test'",
+            job_name="test_job",
+            dependency="afterany:12345:12346",
+        )
+
+        assert job_id == 12347
+        call_args = mock_client.submit_job.call_args
+        assert call_args[1]["dependency"] == "afterany:12345:12346"
+
+    def test_submit_job_with_dependency_afternotok(self):
+        """Test submitting job with afternotok dependency."""
+        mock_client = MagicMock()
+        mock_client.submit_job.return_value = {
+            "job_id": 12348,
+            "dependency": "afternotok:12345",
+        }
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        job_id = hook.submit_job(
+            script="#!/bin/bash\necho 'cleanup'",
+            job_name="cleanup_job",
+            dependency="afternotok:12345",
+        )
+
+        assert job_id == 12348
+        call_args = mock_client.submit_job.call_args
+        assert call_args[1]["dependency"] == "afternotok:12345"
+
+    def test_submit_job_with_dependency_aftercorr(self):
+        """Test submitting job with aftercorr dependency."""
+        mock_client = MagicMock()
+        mock_client.submit_job.return_value = {
+            "job_id": 12349,
+            "dependency": "aftercorr:12345",
+        }
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        job_id = hook.submit_job(
+            script="#!/bin/bash\necho 'correlated task'",
+            job_name="correlated_job",
+            dependency="aftercorr:12345",
+        )
+
+        assert job_id == 12349
+        call_args = mock_client.submit_job.call_args
+        assert call_args[1]["dependency"] == "aftercorr:12345"
+
+    def test_submit_job_with_dependency_singleton(self):
+        """Test submitting job with singleton dependency."""
+        mock_client = MagicMock()
+        mock_client.submit_job.return_value = {
+            "job_id": 12350,
+            "dependency": "singleton",
+        }
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        job_id = hook.submit_job(
+            script="#!/bin/bash\necho 'singleton'",
+            job_name="singleton_job",
+            dependency="singleton",
+        )
+
+        assert job_id == 12350
+        call_args = mock_client.submit_job.call_args
+        assert call_args[1]["dependency"] == "singleton"
+
+    def test_submit_job_with_dependency_after_time(self):
+        """Test submitting job with after+time dependency."""
+        mock_client = MagicMock()
+        mock_client.submit_job.return_value = {
+            "job_id": 12351,
+            "dependency": "after:12345+00:30:00",
+        }
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        job_id = hook.submit_job(
+            script="#!/bin/bash\necho 'delayed'",
+            job_name="delayed_job",
+            dependency="after:12345+00:30:00",
+        )
+
+        assert job_id == 12351
+        call_args = mock_client.submit_job.call_args
+        assert call_args[1]["dependency"] == "after:12345+00:30:00"
+
+    def test_submit_job_with_dependency_afterburstbuffer(self):
+        """Test submitting job with afterburstbuffer dependency."""
+        mock_client = MagicMock()
+        mock_client.submit_job.return_value = {
+            "job_id": 12352,
+            "dependency": "afterburstbuffer:12345",
+        }
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        job_id = hook.submit_job(
+            script="#!/bin/bash\necho 'burst buffer job'",
+            job_name="bb_job",
+            dependency="afterburstbuffer:12345",
+        )
+
+        assert job_id == 12352
+        call_args = mock_client.submit_job.call_args
+        assert call_args[1]["dependency"] == "afterburstbuffer:12345"
+
+    def test_submit_job_with_complex_dependency_and(self):
+        """Test submitting job with complex AND dependency."""
+        mock_client = MagicMock()
+        mock_client.submit_job.return_value = {
+            "job_id": 12353,
+            "dependency": "afterok:12345,afterany:12346",
+        }
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        job_id = hook.submit_job(
+            script="#!/bin/bash\necho 'complex'",
+            job_name="complex_job",
+            dependency="afterok:12345,afterany:12346",
+        )
+
+        assert job_id == 12353
+        call_args = mock_client.submit_job.call_args
+        assert call_args[1]["dependency"] == "afterok:12345,afterany:12346"
+
+    def test_submit_job_with_complex_dependency_or(self):
+        """Test submitting job with complex OR dependency."""
+        mock_client = MagicMock()
+        mock_client.submit_job.return_value = {
+            "job_id": 12354,
+            "dependency": "afterok:12345?afterok:12346",
+        }
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        job_id = hook.submit_job(
+            script="#!/bin/bash\necho 'or dependency'",
+            job_name="or_job",
+            dependency="afterok:12345?afterok:12346",
+        )
+
+        assert job_id == 12354
+        call_args = mock_client.submit_job.call_args
+        assert call_args[1]["dependency"] == "afterok:12345?afterok:12346"
+
+    def test_submit_job_with_array_and_dependency(self):
+        """Test submitting array job with dependency."""
+        mock_client = MagicMock()
+        mock_client.submit_job.return_value = {
+            "job_id": 12355,
+            "array": "0-99",
+            "dependency": "afterok:12345",
+            "array_task_count": 100,
+        }
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        job_id = hook.submit_job(
+            script="#!/bin/bash\necho $SLURM_ARRAY_TASK_ID",
+            job_name="dependent_array",
+            array="0-99",
+            dependency="afterok:12345",
+        )
+
+        assert job_id == 12355
+        call_args = mock_client.submit_job.call_args
+
+        # Verify both array and dependency were passed
+        assert call_args[1]["array"] == "0-99"
+        assert call_args[1]["dependency"] == "afterok:12345"
+
+    def test_submit_job_with_invalid_dependency(self):
+        """Test submitting job with invalid dependency."""
+        mock_client = MagicMock()
+        mock_client.submit_job.side_effect = SlurmAPIError(
+            "Invalid dependency specification: invalid:abc"
+        )
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        with pytest.raises(SlurmAPIError) as exc_info:
+            hook.submit_job(
+                script="#!/bin/bash\necho 'test'",
+                job_name="test_job",
+                dependency="invalid:abc",
+            )
+
+        assert "Invalid dependency specification" in str(exc_info.value)
+
+    def test_submit_job_with_multiple_job_ids_dependency(self):
+        """Test submitting job with dependency on multiple jobs."""
+        mock_client = MagicMock()
+        mock_client.submit_job.return_value = {
+            "job_id": 12356,
+            "dependency": "afterok:12345:12346:12347",
+        }
+
+        hook = SlurmHook(api_url="https://slurm.example.com:6820")
+        hook._client = mock_client
+
+        job_id = hook.submit_job(
+            script="#!/bin/bash\necho 'multi-dependency'",
+            job_name="multi_dep_job",
+            dependency="afterok:12345:12346:12347",
+        )
+
+        assert job_id == 12356
+        call_args = mock_client.submit_job.call_args
+        assert call_args[1]["dependency"] == "afterok:12345:12346:12347"

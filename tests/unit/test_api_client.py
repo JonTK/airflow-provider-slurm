@@ -564,3 +564,163 @@ class TestSlurmAPIClient:
 
         result = api_client.cancel_array_task(12345, array_task_id=5)
         assert result is not None
+
+    # Dependency tests
+
+    def test_validate_dependency_afterok_single(self, api_client):
+        """Test dependency validation for single afterok."""
+        is_valid, error = api_client.validate_dependency("afterok:12345")
+        assert is_valid is True
+        assert error is None
+
+    def test_validate_dependency_afterok_multiple(self, api_client):
+        """Test dependency validation for multiple job IDs."""
+        is_valid, error = api_client.validate_dependency("afterok:12345:12346:12347")
+        assert is_valid is True
+        assert error is None
+
+    def test_validate_dependency_afterany(self, api_client):
+        """Test dependency validation for afterany."""
+        is_valid, error = api_client.validate_dependency("afterany:12345:12346")
+        assert is_valid is True
+        assert error is None
+
+    def test_validate_dependency_afternotok(self, api_client):
+        """Test dependency validation for afternotok."""
+        is_valid, error = api_client.validate_dependency("afternotok:12345")
+        assert is_valid is True
+        assert error is None
+
+    def test_validate_dependency_aftercorr(self, api_client):
+        """Test dependency validation for aftercorr."""
+        is_valid, error = api_client.validate_dependency("aftercorr:12345")
+        assert is_valid is True
+        assert error is None
+
+    def test_validate_dependency_singleton(self, api_client):
+        """Test dependency validation for singleton."""
+        is_valid, error = api_client.validate_dependency("singleton")
+        assert is_valid is True
+        assert error is None
+
+    def test_validate_dependency_after_with_time(self, api_client):
+        """Test dependency validation for after with time offset."""
+        is_valid, error = api_client.validate_dependency("after:12345+60")
+        assert is_valid is True
+        assert error is None
+
+    def test_validate_dependency_afterburstbuffer(self, api_client):
+        """Test dependency validation for afterburstbuffer."""
+        is_valid, error = api_client.validate_dependency("afterburstbuffer:12345")
+        assert is_valid is True
+        assert error is None
+
+    def test_validate_dependency_and_combinator(self, api_client):
+        """Test dependency validation with AND combinator."""
+        is_valid, error = api_client.validate_dependency("afterok:12345,afterany:12346")
+        assert is_valid is True
+        assert error is None
+
+    def test_validate_dependency_or_combinator(self, api_client):
+        """Test dependency validation with OR combinator."""
+        is_valid, error = api_client.validate_dependency("afterok:12345?afternotok:12346")
+        assert is_valid is True
+        assert error is None
+
+    def test_validate_dependency_complex(self, api_client):
+        """Test dependency validation with complex combinations."""
+        is_valid, error = api_client.validate_dependency(
+            "afterok:100:101,afterany:102?afternotok:103"
+        )
+        assert is_valid is True
+        assert error is None
+
+    def test_validate_dependency_invalid_type(self, api_client):
+        """Test dependency validation with invalid type."""
+        is_valid, error = api_client.validate_dependency("invalid:12345")
+        assert is_valid is False
+        assert "Invalid dependency type" in error
+
+    def test_validate_dependency_invalid_format(self, api_client):
+        """Test dependency validation with invalid format."""
+        is_valid, error = api_client.validate_dependency("afterok:abc")
+        assert is_valid is False
+        assert "Invalid" in error
+
+    def test_validate_dependency_empty(self, api_client):
+        """Test dependency validation with empty string."""
+        is_valid, error = api_client.validate_dependency("")
+        assert is_valid is False
+        assert "Empty" in error
+
+    def test_validate_dependency_none(self, api_client):
+        """Test dependency validation with None."""
+        is_valid, error = api_client.validate_dependency(None)
+        assert is_valid is False
+        assert error is not None
+
+    @responses.activate
+    def test_submit_job_with_dependency(self, api_client):
+        """Test job submission with dependency."""
+        job_spec = {
+            "script": "#!/bin/bash\necho 'dependent job'",
+            "job": {
+                "name": "dependent_test",
+                "partition": "compute",
+            },
+        }
+
+        responses.add(
+            responses.POST,
+            "https://slurm.example.com:6820/slurm/v0.0.42/job/submit",
+            json={"job_id": 12346},
+            status=200,
+        )
+
+        result = api_client.submit_job(job_spec, dependency="afterok:12345")
+        assert result["job_id"] == 12346
+        assert result["dependency"] == "afterok:12345"
+
+        # Verify dependency was added to job spec
+        request_body = responses.calls[0].request.body
+        assert b'"dependency": "afterok:12345"' in request_body
+
+    @responses.activate
+    def test_submit_job_with_array_and_dependency(self, api_client):
+        """Test job submission with both array and dependency."""
+        job_spec = {
+            "script": "#!/bin/bash\necho $SLURM_ARRAY_TASK_ID",
+            "job": {
+                "name": "dependent_array",
+            },
+        }
+
+        responses.add(
+            responses.POST,
+            "https://slurm.example.com:6820/slurm/v0.0.42/job/submit",
+            json={"job_id": 12347, "step_id": "0-9"},
+            status=200,
+        )
+
+        result = api_client.submit_job(
+            job_spec, array="0-9", dependency="afterok:12345"
+        )
+        assert result["job_id"] == 12347
+        assert result["array"] == "0-9"
+        assert result["array_task_count"] == 10
+        assert result["dependency"] == "afterok:12345"
+
+        # Verify both were added to job spec
+        request_body = responses.calls[0].request.body
+        assert b'"array": "0-9"' in request_body
+        assert b'"dependency": "afterok:12345"' in request_body
+
+    @responses.activate
+    def test_submit_job_with_invalid_dependency(self, api_client):
+        """Test job submission with invalid dependency."""
+        job_spec = {"script": "#!/bin/bash", "job": {}}
+
+        with pytest.raises(SlurmAPIError) as exc_info:
+            api_client.submit_job(job_spec, dependency="invalid:abc")
+
+        assert "Invalid dependency specification" in str(exc_info.value)

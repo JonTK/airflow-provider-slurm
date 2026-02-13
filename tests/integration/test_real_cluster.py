@@ -828,3 +828,380 @@ fi
         assert result["array_status"]["state"] == "PARTIALLY_COMPLETED"
         assert result["array_status"]["completed"] == 4
         assert result["array_status"]["failed"] == 1
+
+    # Job dependency tests
+
+    def test_hook_submit_with_dependency_afterok(
+        self, slurm_hook, mock_airflow_connection
+    ):
+        """Test submitting job with afterok dependency."""
+        # First submit a prerequisite job
+        prereq_script = """#!/bin/bash
+echo "Prerequisite job"
+sleep 3
+echo "Prerequisite complete"
+"""
+
+        prereq_job_id = slurm_hook.submit_job(
+            script=prereq_script,
+            job_name="prereq-job",
+            partition="debug",
+            cpus_per_task=1,
+            mem="100M",
+            time_limit="00:01:00",
+        )
+
+        logger.info(f"Submitted prerequisite job {prereq_job_id}")
+
+        # Submit dependent job
+        dependent_script = """#!/bin/bash
+echo "Dependent job starting"
+echo "This runs after job completes successfully"
+sleep 2
+echo "Dependent job complete"
+"""
+
+        dependent_job_id = slurm_hook.submit_job(
+            script=dependent_script,
+            job_name="dependent-job",
+            partition="debug",
+            cpus_per_task=1,
+            mem="100M",
+            time_limit="00:01:00",
+            dependency=f"afterok:{prereq_job_id}",
+        )
+
+        logger.info(
+            f"Submitted dependent job {dependent_job_id} (depends on {prereq_job_id})"
+        )
+
+        # Verify dependent job is initially pending
+        time.sleep(2)
+        dep_status = slurm_hook.get_job_status(dependent_job_id)
+        if dep_status:
+            state = dep_status.get("job_state")
+            logger.info(f"Dependent job state: {state}")
+            # Should be pending or running (if prereq already completed)
+            assert state in ["PENDING", "RUNNING", "COMPLETED"]
+
+        # Wait for both jobs to complete
+        final_state = slurm_hook.wait_for_job(prereq_job_id, timeout=60)
+        assert final_state == "COMPLETED"
+        logger.info(f"Prerequisite job {prereq_job_id} completed")
+
+        final_state = slurm_hook.wait_for_job(dependent_job_id, timeout=60)
+        assert final_state == "COMPLETED"
+        logger.info(f"Dependent job {dependent_job_id} completed")
+
+    def test_hook_submit_with_dependency_afterany(
+        self, slurm_hook, mock_airflow_connection
+    ):
+        """Test submitting job with afterany dependency (runs after job ends, regardless of exit status)."""
+        # Submit a job that will fail
+        failing_script = """#!/bin/bash
+echo "This job will fail"
+sleep 2
+exit 1
+"""
+
+        failing_job_id = slurm_hook.submit_job(
+            script=failing_script,
+            job_name="failing-job",
+            partition="debug",
+            cpus_per_task=1,
+            mem="100M",
+            time_limit="00:01:00",
+        )
+
+        logger.info(f"Submitted failing job {failing_job_id}")
+
+        # Submit cleanup job with afterany
+        cleanup_script = """#!/bin/bash
+echo "Cleanup job - runs regardless of previous job's exit status"
+sleep 2
+echo "Cleanup complete"
+"""
+
+        cleanup_job_id = slurm_hook.submit_job(
+            script=cleanup_script,
+            job_name="cleanup-job",
+            partition="debug",
+            cpus_per_task=1,
+            mem="100M",
+            time_limit="00:01:00",
+            dependency=f"afterany:{failing_job_id}",
+        )
+
+        logger.info(
+            f"Submitted cleanup job {cleanup_job_id} with afterany:{failing_job_id}"
+        )
+
+        # Wait for failing job
+        try:
+            slurm_hook.wait_for_job(failing_job_id, timeout=60)
+        except Exception:
+            # Expected to fail
+            logger.info(f"Failing job {failing_job_id} failed as expected")
+
+        # Cleanup job should still run
+        final_state = slurm_hook.wait_for_job(cleanup_job_id, timeout=60)
+        assert final_state == "COMPLETED"
+        logger.info(f"Cleanup job {cleanup_job_id} completed successfully")
+
+    def test_hook_submit_with_dependency_multiple_jobs(
+        self, slurm_hook, mock_airflow_connection
+    ):
+        """Test submitting job with dependency on multiple jobs."""
+        # Submit two prerequisite jobs
+        job_ids = []
+        for i in range(2):
+            script = f"""#!/bin/bash
+echo "Prerequisite job {i+1}"
+sleep 2
+"""
+            job_id = slurm_hook.submit_job(
+                script=script,
+                job_name=f"prereq-{i+1}",
+                partition="debug",
+                cpus_per_task=1,
+                mem="100M",
+                time_limit="00:01:00",
+            )
+            job_ids.append(job_id)
+            logger.info(f"Submitted prerequisite job {i+1}: {job_id}")
+
+        # Submit job depending on both
+        dependent_script = """#!/bin/bash
+echo "Running after both prerequisites complete"
+sleep 2
+"""
+
+        dependency_spec = f"afterok:{job_ids[0]}:{ job_ids[1]}"
+        dependent_job_id = slurm_hook.submit_job(
+            script=dependent_script,
+            job_name="multi-dependent-job",
+            partition="debug",
+            cpus_per_task=1,
+            mem="100M",
+            time_limit="00:01:00",
+            dependency=dependency_spec,
+        )
+
+        logger.info(
+            f"Submitted job {dependent_job_id} depending on {job_ids[0]} and {job_ids[1]}"
+        )
+
+        # Wait for all jobs
+        for job_id in job_ids:
+            slurm_hook.wait_for_job(job_id, timeout=60)
+            logger.info(f"Prerequisite job {job_id} completed")
+
+        final_state = slurm_hook.wait_for_job(dependent_job_id, timeout=60)
+        assert final_state == "COMPLETED"
+        logger.info(f"Multi-dependent job {dependent_job_id} completed")
+
+    def test_hook_submit_with_dependency_singleton(
+        self, slurm_hook, mock_airflow_connection
+    ):
+        """Test submitting job with singleton dependency."""
+        # Submit first instance
+        script = """#!/bin/bash
+echo "Singleton job instance"
+sleep 5
+"""
+
+        job_id1 = slurm_hook.submit_job(
+            script=script,
+            job_name="singleton-test",
+            partition="debug",
+            cpus_per_task=1,
+            mem="100M",
+            time_limit="00:01:00",
+            dependency="singleton",
+        )
+
+        logger.info(f"Submitted first singleton job {job_id1}")
+
+        # Submit second instance with same name - should wait
+        job_id2 = slurm_hook.submit_job(
+            script=script,
+            job_name="singleton-test",  # Same name
+            partition="debug",
+            cpus_per_task=1,
+            mem="100M",
+            time_limit="00:01:00",
+            dependency="singleton",
+        )
+
+        logger.info(f"Submitted second singleton job {job_id2}")
+
+        # Second job should be pending initially
+        time.sleep(2)
+        status = slurm_hook.get_job_status(job_id2)
+        if status:
+            state = status.get("job_state")
+            logger.info(f"Second singleton job state: {state}")
+
+        # Wait for both to complete
+        slurm_hook.wait_for_job(job_id1, timeout=60)
+        slurm_hook.wait_for_job(job_id2, timeout=60)
+        logger.info("Both singleton jobs completed")
+
+    def test_hook_submit_with_array_and_dependency(
+        self, slurm_hook, mock_airflow_connection
+    ):
+        """Test submitting array job with dependency."""
+        # Submit prerequisite job
+        prereq_script = """#!/bin/bash
+echo "Preparing data for array job"
+sleep 2
+"""
+
+        prereq_job_id = slurm_hook.submit_job(
+            script=prereq_script,
+            job_name="array-prereq",
+            partition="debug",
+            cpus_per_task=1,
+            mem="100M",
+            time_limit="00:01:00",
+        )
+
+        logger.info(f"Submitted prerequisite job {prereq_job_id}")
+
+        # Submit array job that depends on it
+        array_script = """#!/bin/bash
+echo "Processing array task $SLURM_ARRAY_TASK_ID"
+sleep 1
+"""
+
+        array_job_id = slurm_hook.submit_job(
+            script=array_script,
+            job_name="dependent-array",
+            partition="debug",
+            cpus_per_task=1,
+            mem="100M",
+            time_limit="00:02:00",
+            array="0-4",  # 5 tasks
+            dependency=f"afterok:{prereq_job_id}",
+        )
+
+        logger.info(f"Submitted array job {array_job_id} depending on {prereq_job_id}")
+
+        # Wait for prerequisite
+        slurm_hook.wait_for_job(prereq_job_id, timeout=60)
+        logger.info(f"Prerequisite job {prereq_job_id} completed")
+
+        # Wait for array
+        final_status = slurm_hook.wait_for_array(array_job_id, timeout=60)
+        assert final_status["state"] == "COMPLETED"
+        assert final_status["total_tasks"] == 5
+        logger.info(f"Dependent array job {array_job_id} completed")
+
+    def test_operator_with_dependency(self, mock_airflow_connection):
+        """Test SlurmOperator with dependency."""
+        from airflow_provider_slurm.hooks.slurm_hook import SlurmHook
+
+        # Submit prerequisite job using hook
+        hook = SlurmHook(slurm_conn_id="slurm_default")
+
+        prereq_script = """#!/bin/bash
+echo "Prerequisite for operator"
+sleep 2
+"""
+
+        prereq_job_id = hook.submit_job(
+            script=prereq_script,
+            job_name="operator-prereq",
+            partition="debug",
+            cpus_per_task=1,
+            mem="100M",
+            time_limit="00:01:00",
+        )
+
+        logger.info(f"Submitted prerequisite job {prereq_job_id}")
+
+        # Create operator with dependency
+        dependent_script = """#!/bin/bash
+echo "Operator job with dependency"
+sleep 2
+"""
+
+        operator = SlurmOperator(
+            task_id="test_dependent_operator",
+            script=dependent_script,
+            job_name="dependent-operator-job",
+            slurm_conn_id="slurm_default",
+            partition="debug",
+            cpus_per_task=1,
+            mem="100M",
+            time_limit="00:01:00",
+            dependency=f"afterok:{prereq_job_id}",
+            wait_for_completion=True,
+        )
+
+        mock_context = {}
+        result = operator.execute(mock_context)
+
+        logger.info(f"Operator result: {result}")
+
+        # Check result includes dependency
+        assert result["job_id"] > 0
+        assert result["dependency"] == f"afterok:{prereq_job_id}"
+
+        logger.info(f"Dependent operator job {result['job_id']} completed successfully")
+
+    def test_operator_with_array_and_dependency(self, mock_airflow_connection):
+        """Test SlurmOperator with both array and dependency."""
+        from airflow_provider_slurm.hooks.slurm_hook import SlurmHook
+
+        # Submit prerequisite
+        hook = SlurmHook(slurm_conn_id="slurm_default")
+
+        prereq_script = """#!/bin/bash
+echo "Setup for array"
+sleep 2
+"""
+
+        prereq_job_id = hook.submit_job(
+            script=prereq_script,
+            job_name="array-dep-prereq",
+            partition="debug",
+            cpus_per_task=1,
+            mem="100M",
+            time_limit="00:01:00",
+        )
+
+        logger.info(f"Submitted prerequisite {prereq_job_id}")
+
+        # Create operator with array and dependency
+        array_script = """#!/bin/bash
+echo "Array task $SLURM_ARRAY_TASK_ID after dependency"
+"""
+
+        operator = SlurmOperator(
+            task_id="test_array_dep_operator",
+            script=array_script,
+            job_name="array-dep-operator",
+            slurm_conn_id="slurm_default",
+            partition="debug",
+            cpus_per_task=1,
+            mem="100M",
+            time_limit="00:02:00",
+            array="0-3",  # 4 tasks
+            dependency=f"afterok:{prereq_job_id}",
+            wait_for_completion=True,
+        )
+
+        mock_context = {}
+        result = operator.execute(mock_context)
+
+        logger.info(f"Array + dependency operator result: {result}")
+
+        # Check result structure
+        assert result["is_array"] is True
+        assert result["array_spec"] == "0-3"
+        assert result["dependency"] == f"afterok:{prereq_job_id}"
+        assert result["array_status"]["state"] == "COMPLETED"
+        assert result["array_status"]["total_tasks"] == 4
+
+        logger.info("Array job with dependency completed successfully")

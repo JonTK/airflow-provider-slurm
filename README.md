@@ -120,6 +120,74 @@ limited_array = SlurmOperator(
 )
 ```
 
+### Job Dependencies
+
+Chain Slurm jobs together using native dependency specifications. Jobs won't start until their dependencies complete successfully:
+
+```python
+from airflow_provider_slurm.operators.slurm import SlurmOperator
+from airflow.decorators import task
+
+# Traditional approach with Operator
+preprocessing = SlurmOperator(
+    task_id='preprocess',
+    script='#!/bin/bash\npython preprocess.py',
+    job_name='data_preprocessing',
+    partition='compute',
+)
+
+# Dependent job uses XCom to get job_id
+@task
+def create_analysis_job(preprocessing_result):
+    analysis = SlurmOperator(
+        task_id='analysis',
+        script='#!/bin/bash\npython analyze.py',
+        job_name='data_analysis',
+        dependency=f"afterok:{preprocessing_result['job_id']}",  # Wait for success
+        partition='compute',
+    )
+    return analysis.execute({})
+
+preprocessing_result = preprocessing.execute({})
+analysis_result = create_analysis_job(preprocessing_result)
+```
+
+**Using templatable dependencies:**
+
+```python
+# Dependency field is templatable - use Jinja to get job_id from XCom
+analysis = SlurmOperator(
+    task_id='analysis',
+    script='#!/bin/bash\npython analyze.py',
+    job_name='analysis',
+    dependency="afterok:{{ task_instance.xcom_pull('preprocess') }}",
+    partition='compute',
+)
+```
+
+**Supported dependency types:**
+
+- `afterok:job_id` - Start after job completes successfully
+- `afterany:job_id` - Start after job ends (any exit status)
+- `afternotok:job_id` - Start after job fails
+- `aftercorr:job_id` - Start after corresponding array task completes
+- `singleton` - Only one job with this name runs at a time
+- `after:job_id` - Start after job starts (no exit status check)
+- `afterburstbuffer:job_id` - Start after burst buffer stage out completes
+
+**Complex dependencies with combinators:**
+
+```python
+# AND logic (all must complete) - use comma
+dependency="afterok:12345,afterok:12346"
+
+# OR logic (any must complete) - use question mark
+dependency="afterok:12345?afterok:12346"
+
+# Multiple job IDs for same type - use colon
+dependency="afterok:12345:12346:12347"
+```
+
 ### GPU Computing
 
 ```python
@@ -211,7 +279,8 @@ black . && isort . && flake8
 
 - [Installation Guide](docs/installation.md)
 - [Configuration Reference](docs/configuration.md)
-- [Job Arrays Tutorial](docs/job_arrays.md)
+- [Job Arrays Tutorial](docs/tutorials/job_arrays.md)
+- [Job Dependencies Tutorial](docs/tutorials/job_dependencies.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Contributing](CONTRIBUTING.md)
 
