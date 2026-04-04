@@ -231,7 +231,9 @@ class TestSlurmExecutor:
             "partition": "gpu",
         }
 
-        job_spec = executor._build_job_spec(task_key, command, None, executor_config)
+        job_spec, array_spec, dep_spec = executor._build_job_spec(
+            task_key, command, None, executor_config
+        )
 
         assert "script" in job_spec
         assert "job" in job_spec
@@ -249,10 +251,12 @@ class TestSlurmExecutor:
             "gres": "gpu:2",
         }
 
-        job_spec = executor._build_job_spec(task_key, command, None, executor_config)
+        job_spec, array_spec, dep_spec = executor._build_job_spec(
+            task_key, command, None, executor_config
+        )
 
-        assert "gres" in job_spec["job"]
-        assert job_spec["job"]["gres"] == "gpu:2"
+        assert "tres_per_node" in job_spec["job"]
+        assert job_spec["job"]["tres_per_node"] == "gres/gpu:2"
 
     def test_build_job_spec_with_constraint(self, executor, task_key):
         """Test job specification building with node constraints."""
@@ -264,7 +268,9 @@ class TestSlurmExecutor:
             "constraint": "volta",
         }
 
-        job_spec = executor._build_job_spec(task_key, command, None, executor_config)
+        job_spec, array_spec, dep_spec = executor._build_job_spec(
+            task_key, command, None, executor_config
+        )
 
         assert "constraints" in job_spec["job"]
         assert job_spec["job"]["constraints"] == "volta"
@@ -280,10 +286,12 @@ class TestSlurmExecutor:
             "constraint": "nvlink",
         }
 
-        job_spec = executor._build_job_spec(task_key, command, None, executor_config)
+        job_spec, array_spec, dep_spec = executor._build_job_spec(
+            task_key, command, None, executor_config
+        )
 
-        assert "gres" in job_spec["job"]
-        assert job_spec["job"]["gres"] == "gpu:tesla_v100:4"
+        assert "tres_per_node" in job_spec["job"]
+        assert job_spec["job"]["tres_per_node"] == "gres/gpu:tesla_v100:4"
         assert "constraints" in job_spec["job"]
         assert job_spec["job"]["constraints"] == "nvlink"
 
@@ -299,14 +307,10 @@ class TestSlurmExecutor:
 
         # Mock API response
         mock_client = MagicMock()
-        mock_client.get_jobs.return_value = {
-            "jobs": [
-                {
-                    "job_id": 12345,
-                    "job_state": "COMPLETED",
-                    "exit_code": 0,
-                }
-            ]
+        mock_client.get_job.return_value = {
+            "job_id": 12345,
+            "job_state": "COMPLETED",
+            "exit_code": 0,
         }
         executor.slurm_client = mock_client
 
@@ -318,6 +322,7 @@ class TestSlurmExecutor:
         executor.sync()
 
         # Verify task was marked as success
+        mock_client.get_job.assert_called_once_with(12345)
         executor.success.assert_called_once_with(task_key)
         assert task_key not in executor.running
 
@@ -333,14 +338,10 @@ class TestSlurmExecutor:
 
         # Mock API response
         mock_client = MagicMock()
-        mock_client.get_jobs.return_value = {
-            "jobs": [
-                {
-                    "job_id": 12345,
-                    "job_state": "FAILED",
-                    "state_reason": "NonZeroExitCode",
-                }
-            ]
+        mock_client.get_job.return_value = {
+            "job_id": 12345,
+            "job_state": "FAILED",
+            "state_reason": "NonZeroExitCode",
         }
         executor.slurm_client = mock_client
 
@@ -352,6 +353,7 @@ class TestSlurmExecutor:
         executor.sync()
 
         # Verify task was marked as failed
+        mock_client.get_job.assert_called_once_with(12345)
         executor.fail.assert_called_once_with(task_key)
         assert task_key not in executor.running
 
@@ -368,7 +370,7 @@ class TestSlurmExecutor:
 
         # Mock API response (job not found)
         mock_client = MagicMock()
-        mock_client.get_jobs.return_value = {"jobs": []}
+        mock_client.get_job.return_value = None
         mock_client.get_job_history.return_value = None
         executor.slurm_client = mock_client
 
@@ -380,6 +382,7 @@ class TestSlurmExecutor:
         executor.sync()
 
         # Verify task was marked as failed
+        mock_client.get_job.assert_called_once_with(12345)
         executor.fail.assert_called_once_with(task_key)
         assert task_key not in executor.running
 
@@ -396,7 +399,7 @@ class TestSlurmExecutor:
         # Sync should be skipped due to throttling
         executor.sync()
 
-        mock_client.get_jobs.assert_not_called()
+        mock_client.get_job.assert_not_called()
 
     @patch("airflow_provider_slurm.slurm_executor.SlurmAPIClient")
     def test_end_cancel_mode(self, mock_api_client, executor, task_key):

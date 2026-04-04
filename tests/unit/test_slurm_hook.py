@@ -216,7 +216,7 @@ class TestSlurmHook:
 
         # Verify GRES and constraint in job spec
         job_spec = mock_client.submit_job.call_args[0][0]
-        assert job_spec["job"]["gres"] == "gpu:2"
+        assert job_spec["job"]["tres_per_node"] == "gres/gpu:2"
         assert job_spec["job"]["constraints"] == "volta"
 
     def test_submit_job_no_job_id_raises_error(self):
@@ -379,17 +379,17 @@ class TestSlurmHook:
         assert history["exit_code"] == 0
         mock_client.get_job_history.assert_called_once_with(12345)
 
-    def test_convert_time_to_seconds_hms(self):
+    def test_convert_time_to_minutes_hms(self):
         """Test time conversion HH:MM:SS format."""
-        assert SlurmHook._convert_time_to_seconds("01:30:45") == 5445
+        assert SlurmHook._convert_time_to_minutes("01:30:45") == 91
 
-    def test_convert_time_to_seconds_ms(self):
+    def test_convert_time_to_minutes_ms(self):
         """Test time conversion MM:SS format."""
-        assert SlurmHook._convert_time_to_seconds("30:45") == 1845
+        assert SlurmHook._convert_time_to_minutes("30:45") == 31
 
-    def test_convert_time_to_seconds_s(self):
-        """Test time conversion seconds only."""
-        assert SlurmHook._convert_time_to_seconds("120") == 120
+    def test_convert_time_to_minutes_s(self):
+        """Test time conversion minutes only."""
+        assert SlurmHook._convert_time_to_minutes("120") == 120
 
     def test_close(self):
         """Test hook cleanup."""

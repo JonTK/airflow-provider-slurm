@@ -377,36 +377,27 @@ class TestSlurmAPIClient:
         """Test array spec validation for empty string."""
         is_valid, error = api_client.validate_array_spec("")
         assert is_valid is False
-        assert "Empty array specification" in error
+        assert "Array spec must be a non-empty string" in error
 
     def test_parse_array_spec_range(self, api_client):
         """Test array spec parsing for range."""
-        start, end, step = api_client.parse_array_spec("0-99")
-        assert start == 0
-        assert end == 99
-        assert step == 1
+        count = api_client.parse_array_spec("0-99")
+        assert count == 100
 
     def test_parse_array_spec_range_with_step(self, api_client):
         """Test array spec parsing for range with step."""
-        start, end, step = api_client.parse_array_spec("10-100:5")
-        assert start == 10
-        assert end == 100
-        assert step == 5
+        count = api_client.parse_array_spec("10-100:5")
+        assert count == 19
 
     def test_parse_array_spec_list(self, api_client):
         """Test array spec parsing for list."""
-        start, end, step = api_client.parse_array_spec("1,5,10,15,20")
-        # For list format, return count as end
-        assert start == 0
-        assert end == 5
-        assert step == 1
+        count = api_client.parse_array_spec("1,5,10,15,20")
+        assert count == 5
 
     def test_parse_array_spec_with_limit(self, api_client):
         """Test array spec parsing strips parallelism limit."""
-        start, end, step = api_client.parse_array_spec("0-999%50")
-        assert start == 0
-        assert end == 999
-        assert step == 1
+        count = api_client.parse_array_spec("0-999%50")
+        assert count == 1000
 
     @responses.activate
     def test_submit_job_with_array(self, api_client):
@@ -641,7 +632,7 @@ class TestSlurmAPIClient:
         """Test dependency validation with invalid type."""
         is_valid, error = api_client.validate_dependency("invalid:12345")
         assert is_valid is False
-        assert "Invalid dependency type" in error
+        assert "Invalid dependency specification" in error
 
     def test_validate_dependency_invalid_format(self, api_client):
         """Test dependency validation with invalid format."""
@@ -653,7 +644,7 @@ class TestSlurmAPIClient:
         """Test dependency validation with empty string."""
         is_valid, error = api_client.validate_dependency("")
         assert is_valid is False
-        assert "Empty" in error
+        assert "non-empty" in error
 
     def test_validate_dependency_none(self, api_client):
         """Test dependency validation with None."""
