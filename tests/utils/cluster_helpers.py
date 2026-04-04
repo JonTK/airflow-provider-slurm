@@ -141,7 +141,9 @@ def is_cluster_available(
 
     # Check if explicitly disabled
     if os.getenv("SKIP_REAL_CLUSTER_TESTS", "").lower() in ("1", "true", "yes"):
-        logger.info("Real cluster tests explicitly disabled via SKIP_REAL_CLUSTER_TESTS")
+        logger.info(
+            "Real cluster tests explicitly disabled via SKIP_REAL_CLUSTER_TESTS"
+        )
         return False
 
     # Check network connectivity

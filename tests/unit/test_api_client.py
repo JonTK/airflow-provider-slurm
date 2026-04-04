@@ -623,7 +623,9 @@ class TestSlurmAPIClient:
 
     def test_validate_dependency_or_combinator(self, api_client):
         """Test dependency validation with OR combinator."""
-        is_valid, error = api_client.validate_dependency("afterok:12345?afternotok:12346")
+        is_valid, error = api_client.validate_dependency(
+            "afterok:12345?afternotok:12346"
+        )
         assert is_valid is True
         assert error is None
 

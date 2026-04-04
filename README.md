@@ -279,7 +279,7 @@ black . && isort . && flake8
 
 - [Installation Guide](docs/installation.md)
 - [Configuration Reference](docs/configuration.md)
-- [Job Arrays Tutorial](docs/tutorials/job_arrays.md)
+- [Job Arrays Tutorial](docs/job_arrays.md)
 - [Job Dependencies Tutorial](docs/tutorials/job_dependencies.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Contributing](CONTRIBUTING.md)

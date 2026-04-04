@@ -147,13 +147,18 @@ def mock_airflow_connection(local_token, api_version):
 
             # Patch the default API version so Operator/Sensor use the parametrized version
             with patch.object(
-                SlurmAPIClient, "__init__",
+                SlurmAPIClient,
+                "__init__",
                 wraps=SlurmAPIClient.__init__,
             ) as mock_init:
                 original_init = SlurmAPIClient.__init__
 
-                def patched_init(self, base_url, token_manager, api_version=api_version, **kwargs):
-                    original_init(self, base_url, token_manager, api_version=api_version, **kwargs)
+                def patched_init(
+                    self, base_url, token_manager, api_version=api_version, **kwargs
+                ):
+                    original_init(
+                        self, base_url, token_manager, api_version=api_version, **kwargs
+                    )
 
                 with patch.object(SlurmAPIClient, "__init__", patched_init):
                     yield mock_conn
@@ -280,9 +285,7 @@ class TestAPIClient:
                 "time_limit": {"minutes": 1},
             },
         }
-        dep_result = api_client.submit_job(
-            dep_spec, dependency=f"afterok:{prereq_id}"
-        )
+        dep_result = api_client.submit_job(dep_spec, dependency=f"afterok:{prereq_id}")
         dep_id = dep_result["job_id"]
         assert dep_result.get("dependency") == f"afterok:{prereq_id}"
 
@@ -638,7 +641,9 @@ class TestSensor:
             try:
                 result = sensor.poke({})
                 if result:
-                    pytest.fail("Sensor should have raised on failure, not returned True")
+                    pytest.fail(
+                        "Sensor should have raised on failure, not returned True"
+                    )
                 time.sleep(2)
             except SlurmAPIError as e:
                 logger.info(f"Sensor correctly raised on failure: {e}")
@@ -1055,7 +1060,9 @@ class TestHookAdvanced:
         assert info is not None
         tres_alloc = info.get("tres_alloc_str", "")
         logger.info(f"Job {job_id} TRES allocated: {tres_alloc}")
-        assert "gres/gpu=1" in tres_alloc, f"GPU not allocated! tres_alloc_str={tres_alloc}"
+        assert (
+            "gres/gpu=1" in tres_alloc
+        ), f"GPU not allocated! tres_alloc_str={tres_alloc}"
 
         slurm_hook.cancel_job(job_id)
 
@@ -1187,7 +1194,9 @@ class TestHookAdvanced:
         tres_alloc = info.get("tres_alloc_str", "")
         logger.info(f"Job {job_id} TRES: {tres_alloc}")
         # node1 has 6 CPUs - exclusive should allocate all of them
-        assert "cpu=6" in tres_alloc, f"Expected all 6 CPUs for exclusive, got tres={tres_alloc}"
+        assert (
+            "cpu=6" in tres_alloc
+        ), f"Expected all 6 CPUs for exclusive, got tres={tres_alloc}"
 
         slurm_hook.cancel_job(job_id)
 

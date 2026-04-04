@@ -292,7 +292,9 @@ class SlurmExecutor(BaseExecutor):
         """
         for workload in wls:
             if not isinstance(workload, workloads.ExecuteTask):
-                logger.warning(f"Ignoring unknown workload type: {type(workload).__name__}")
+                logger.warning(
+                    f"Ignoring unknown workload type: {type(workload).__name__}"
+                )
                 continue
 
             ti = workload.ti
@@ -306,8 +308,8 @@ class SlurmExecutor(BaseExecutor):
                 script = self._build_supervisor_script(workload)
 
                 # Build job parameters
-                job_spec, array_spec, dependency_spec = self._build_job_spec_from_workload(
-                    workload, config
+                job_spec, array_spec, dependency_spec = (
+                    self._build_job_spec_from_workload(workload, config)
                 )
                 job_spec["script"] = script
 
@@ -327,7 +329,9 @@ class SlurmExecutor(BaseExecutor):
                     }
                     if array_spec:
                         job_metadata["array_spec"] = array_spec
-                        job_metadata["array_task_count"] = result.get("array_task_count", 0)
+                        job_metadata["array_task_count"] = result.get(
+                            "array_task_count", 0
+                        )
                     if dependency_spec:
                         job_metadata["dependency"] = dependency_spec
 
@@ -349,6 +353,7 @@ class SlurmExecutor(BaseExecutor):
         base_url = conf.get("api", "base_url", fallback="/")
         if base_url.startswith("/"):
             import socket
+
             hostname = socket.getfqdn()
             base_url = f"http://{hostname}:8080{base_url}"
         execution_api_url = f"{base_url.rstrip('/')}/execution/"
@@ -371,32 +376,36 @@ class SlurmExecutor(BaseExecutor):
 
         # Activate virtual environment if configured
         if self.airflow_venv and not self.default_container:
-            lines.extend([
-                "# Activate virtual environment",
-                f"source {self.airflow_venv}/bin/activate",
-                "",
-            ])
+            lines.extend(
+                [
+                    "# Activate virtual environment",
+                    f"source {self.airflow_venv}/bin/activate",
+                    "",
+                ]
+            )
 
         # Run the task using the Airflow 3.x supervisor
-        lines.extend([
-            "# Execute Airflow task via supervisor",
-            "python3 << 'PYEOF'",
-            "import sys",
-            "from airflow.sdk.execution_time.supervisor import supervise",
-            "from airflow.executors.workloads import ExecuteTask",
-            "",
-            f'workload = ExecuteTask.model_validate_json(open("{workload_file}").read())',
-            "exit_code = supervise(",
-            "    ti=workload.ti,",
-            "    dag_rel_path=workload.dag_rel_path,",
-            "    bundle_info=workload.bundle_info,",
-            "    token=workload.token,",
-            f'    server="{execution_api_url}",',
-            "    log_path=workload.log_path,",
-            ")",
-            "sys.exit(exit_code)",
-            "PYEOF",
-        ])
+        lines.extend(
+            [
+                "# Execute Airflow task via supervisor",
+                "python3 << 'PYEOF'",
+                "import sys",
+                "from airflow.sdk.execution_time.supervisor import supervise",
+                "from airflow.executors.workloads import ExecuteTask",
+                "",
+                f'workload = ExecuteTask.model_validate_json(open("{workload_file}").read())',
+                "exit_code = supervise(",
+                "    ti=workload.ti,",
+                "    dag_rel_path=workload.dag_rel_path,",
+                "    bundle_info=workload.bundle_info,",
+                "    token=workload.token,",
+                f'    server="{execution_api_url}",',
+                "    log_path=workload.log_path,",
+                ")",
+                "sys.exit(exit_code)",
+                "PYEOF",
+            ]
+        )
 
         return "\n".join(lines)
 
@@ -422,8 +431,12 @@ class SlurmExecutor(BaseExecutor):
         # Determine log path
         base_log_folder = conf.get("logging", "base_log_folder")
         log_path = os.path.join(
-            base_log_folder, "dags", ti.dag_id, ti.task_id,
-            ti.run_id, f"{ti.try_number}.log",
+            base_log_folder,
+            "dags",
+            ti.dag_id,
+            ti.task_id,
+            ti.run_id,
+            f"{ti.try_number}.log",
         )
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
 
@@ -467,7 +480,9 @@ class SlurmExecutor(BaseExecutor):
         job_spec = {"job": job_params}
         return job_spec, array_spec, dependency_spec
 
-    def _build_workload_environment(self, workload: "workloads.ExecuteTask") -> List[str]:
+    def _build_workload_environment(
+        self, workload: "workloads.ExecuteTask"
+    ) -> List[str]:
         """Build environment variables for a workload execution.
 
         Returns a list of KEY=value strings as required by the Slurm REST API.
@@ -481,11 +496,13 @@ class SlurmExecutor(BaseExecutor):
         if "HOME" not in env:
             env["HOME"] = os.path.expanduser("~")
 
-        env.update({
-            "AIRFLOW_HOME": self.airflow_home,
-            "AIRFLOW__CORE__DAGS_FOLDER": conf.get("core", "dags_folder"),
-            "AIRFLOW__CORE__EXECUTOR": "LocalExecutor",
-        })
+        env.update(
+            {
+                "AIRFLOW_HOME": self.airflow_home,
+                "AIRFLOW__CORE__DAGS_FOLDER": conf.get("core", "dags_folder"),
+                "AIRFLOW__CORE__EXECUTOR": "LocalExecutor",
+            }
+        )
 
         # Slurm REST API requires environment as array of "KEY=value" strings
         return [f"{k}={v}" for k, v in env.items()]
