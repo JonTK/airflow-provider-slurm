@@ -21,7 +21,9 @@ with warnings.catch_warnings():
             from airflow.hooks.base_hook import BaseHook  # noqa: F811
         except ImportError:
             # Fallback
-            from airflow.hooks.base import BaseHook  # noqa: F811
+            from airflow.hooks.base import (  # noqa: F811
+                BaseHook,
+            )
 
 from airflow_provider_slurm.exceptions import SlurmAPIError, SlurmConfigurationError
 from airflow_provider_slurm.slurm_api_client import SlurmAPIClient
