@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Union
 
 from airflow.configuration import conf
-from airflow.executors.base_executor import BaseExecutor
 from airflow.executors import workloads
+from airflow.executors.base_executor import BaseExecutor
 from airflow.models.taskinstance import TaskInstance, TaskInstanceKey
 
 from airflow_provider_slurm.exceptions import (

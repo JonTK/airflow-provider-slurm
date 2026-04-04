@@ -525,8 +525,8 @@ echo "Job complete"
         """Test SlurmSensor failure detection."""
         logger.info("Testing SlurmSensor failure detection")
 
-        from airflow_provider_slurm.hooks.slurm_hook import SlurmHook
         from airflow_provider_slurm.exceptions import SlurmAPIError
+        from airflow_provider_slurm.hooks.slurm_hook import SlurmHook
 
         hook = SlurmHook(slurm_conn_id="slurm_default")
 

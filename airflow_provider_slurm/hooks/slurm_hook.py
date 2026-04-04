@@ -18,7 +18,9 @@ with warnings.catch_warnings():
     except ImportError:
         try:
             # Airflow 2.x
-            from airflow.hooks.base_hook import BaseHook  # type: ignore[import-untyped, no-redef]
+            from airflow.hooks.base_hook import (
+                BaseHook,  # type: ignore[import-untyped, no-redef]
+            )
         except ImportError:
             # Fallback for older versions
             from airflow.hooks.base import BaseHook  # type: ignore[import-untyped, no-redef]
