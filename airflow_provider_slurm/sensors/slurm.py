@@ -122,6 +122,9 @@ class SlurmSensor(BaseSensorOperator):
                 raise SlurmAPIError(f"Job {self.job_id} not found in queue or history")
 
         state = job_info.get("job_state", "UNKNOWN")
+        # Slurm REST API v0.0.41+ returns job_state as a list
+        if isinstance(state, list):
+            state = state[0] if state else "UNKNOWN"
         logger.info(f"Job {self.job_id} is in state: {state}")
 
         # Check if in success state

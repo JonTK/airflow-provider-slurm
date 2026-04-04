@@ -601,9 +601,14 @@ class SlurmAPIClient:
         """
         logger.debug(f"Getting array status for job {job_id}")
 
-        # Query all jobs - Slurm returns array tasks as separate entries
-        result = self.get_jobs([job_id])
-        jobs = result.get("jobs", [])
+        # Use single-job endpoint which returns all array tasks for the parent
+        endpoint = f"/slurm/{self.api_version}/job/{job_id}"
+        try:
+            response = self._request("GET", endpoint)
+            result = response.json()
+            jobs = result.get("jobs", [])
+        except SlurmAPIError:
+            jobs = []
 
         if not jobs:
             # Try history
@@ -640,18 +645,16 @@ class SlurmAPIClient:
             elif "FAIL" in state.upper():
                 state_counts["FAILED"] += 1
 
-            # Extract array info
-            if not array_spec:
-                # Try to get array specification from job info
-                array_job_id = job.get("array_job_id")
-                array_task_id = job.get("array_task_id")
-                if array_job_id and array_task_id is not None:
-                    # This is an array task
-                    pass  # array_spec would need to be reconstructed or stored
+            # Extract array task ID (handles both plain int and v0.0.41+ object format)
+            raw_task_id = job.get("array_task_id", 0)
+            if isinstance(raw_task_id, dict):
+                task_id = raw_task_id.get("number", 0) if raw_task_id.get("set") else 0
+            else:
+                task_id = raw_task_id
 
             task_details.append(
                 {
-                    "task_id": job.get("array_task_id", 0),
+                    "task_id": task_id,
                     "state": state,
                     "exit_code": job.get("exit_code"),
                 }

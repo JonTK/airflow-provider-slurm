@@ -261,22 +261,26 @@ class SlurmHook(BaseHook):
             "tasks": 1,
             "cpus_per_task": cpus_per_task,
             "memory_per_node": mem,
-            "time_limit": self._convert_time_to_seconds(time_limit),
+            "time_limit": self._convert_time_to_minutes(time_limit),
         }
 
         # Add optional parameters
         if partition:
             job_params["partition"] = partition
-        if working_dir:
-            job_params["current_working_directory"] = working_dir
+        job_params["current_working_directory"] = working_dir or "/tmp"
         if stdout:
             job_params["standard_output"] = stdout
         if stderr:
             job_params["standard_error"] = stderr
         if environment:
             job_params["environment"] = environment
+        else:
+            # Slurm REST API requires environment to be set
+            job_params["environment"] = ["PATH=/usr/bin:/usr/local/bin:/bin"]
         if gres:
-            job_params["gres"] = gres
+            # Slurm REST API uses tres_per_node for GRES (e.g., "gpu:1" -> "gres/gpu:1")
+            gres_value = gres if gres.startswith("gres/") else f"gres/{gres}"
+            job_params["tres_per_node"] = gres_value
         if constraint:
             job_params["constraints"] = constraint
         if account:
@@ -284,13 +288,15 @@ class SlurmHook(BaseHook):
         if qos:
             job_params["qos"] = qos
         if nodes is not None:
-            job_params["nodes"] = nodes
+            job_params["minimum_nodes"] = nodes
         if ntasks_per_node is not None:
-            job_params["ntasks_per_node"] = ntasks_per_node
+            job_params["tasks_per_node"] = ntasks_per_node
         if exclusive:
-            job_params["exclusive"] = True
+            # Use "shared" field (works across API versions; "exclusive" deprecated in v0.0.42+)
+            job_params["shared"] = ["none"]
         if nodelist:
-            job_params["nodelist"] = nodelist
+            # Slurm REST API uses "required_nodes" field (list of node names)
+            job_params["required_nodes"] = [nodelist]
 
         # Add any additional parameters
         job_params.update(kwargs)
@@ -403,6 +409,9 @@ class SlurmHook(BaseHook):
                 raise SlurmAPIError(f"Job {job_id} not found")
 
             state = job_info.get("job_state", "UNKNOWN")
+            # Slurm REST API v0.0.41+ returns job_state as a list
+            if isinstance(state, list):
+                state = state[0] if state else "UNKNOWN"
 
             # Terminal states
             if state == "COMPLETED":
@@ -565,22 +574,29 @@ class SlurmHook(BaseHook):
         return result is not None
 
     @staticmethod
-    def _convert_time_to_seconds(time_str: str) -> int:
-        """Convert time string HH:MM:SS to seconds.
+    def _convert_time_to_minutes(time_str: str) -> int:
+        """Convert time string HH:MM:SS to minutes for Slurm REST API.
+
+        The Slurm REST API interprets the time_limit integer as minutes.
 
         Args:
             time_str: Time string in HH:MM:SS format
 
         Returns:
-            Time in seconds
+            Time in minutes
         """
         parts = time_str.split(":")
         if len(parts) == 3:
             hours, minutes, seconds = map(int, parts)
-            return hours * 3600 + minutes * 60 + seconds
+            total_minutes = hours * 60 + minutes
+            if seconds > 0:
+                total_minutes += 1  # Round up partial minutes
+            return total_minutes
         elif len(parts) == 2:
             minutes, seconds = map(int, parts)
-            return minutes * 60 + seconds
+            if seconds > 0:
+                minutes += 1
+            return minutes
         else:
             return int(parts[0])
 

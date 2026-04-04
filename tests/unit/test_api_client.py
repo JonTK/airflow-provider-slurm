@@ -450,7 +450,7 @@ class TestSlurmAPIClient:
         """Test getting array job status."""
         responses.add(
             responses.GET,
-            "https://slurm.example.com:6820/slurm/v0.0.42/jobs?job_id=12345",
+            "https://slurm.example.com:6820/slurm/v0.0.42/job/12345",
             json={
                 "jobs": [
                     {
@@ -489,7 +489,7 @@ class TestSlurmAPIClient:
         """Test array status when all tasks completed."""
         responses.add(
             responses.GET,
-            "https://slurm.example.com:6820/slurm/v0.0.42/jobs?job_id=12345",
+            "https://slurm.example.com:6820/slurm/v0.0.42/job/12345",
             json={
                 "jobs": [
                     {
@@ -514,7 +514,7 @@ class TestSlurmAPIClient:
         """Test array status with some failures."""
         responses.add(
             responses.GET,
-            "https://slurm.example.com:6820/slurm/v0.0.42/jobs?job_id=12345",
+            "https://slurm.example.com:6820/slurm/v0.0.42/job/12345",
             json={
                 "jobs": [
                     {

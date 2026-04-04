@@ -143,6 +143,12 @@ slurm_manifests/
 *.err
 slurm-*.out
 
+# Test Airflow home (generated artifacts)
+test_airflow_home/airflow.db
+test_airflow_home/logs/
+test_airflow_home/workloads/
+test_airflow_home/*.json.generated
+
 # Beads task management
 .beads/
 AGENTS.md
