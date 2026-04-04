@@ -221,4 +221,4 @@ echo "Batch ${{SLURM_ARRAY_TASK_ID}} complete"
 
     # Dynamic workflow
     num_batches = prepare_data_batches()
-    batch_results = process_batches(num_batches)
+    process_batches(num_batches)

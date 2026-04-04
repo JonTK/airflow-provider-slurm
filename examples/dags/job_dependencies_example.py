@@ -440,8 +440,4 @@ echo "Dependent job complete"
 
     # Pattern 5: Dynamic dependencies with XCom
     base_id = submit_base_job()
-    pattern5_result = submit_dependent_job(base_id)
-
-    # Optional: Add Airflow task dependencies for visualization
-    # (These are separate from Slurm dependencies)
-    pattern1_result >> pattern2_result >> pattern3_result >> pattern4_result >> base_id
+    submit_dependent_job(base_id)

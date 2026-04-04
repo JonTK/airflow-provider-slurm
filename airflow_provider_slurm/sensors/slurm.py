@@ -4,7 +4,7 @@ This sensor waits for a Slurm job to reach a terminal state.
 """
 
 import logging
-from typing import Any, Dict, Optional, Sequence
+from typing import Any, Optional, Sequence
 
 from airflow.sensors.base import BaseSensorOperator
 from airflow.utils.context import Context

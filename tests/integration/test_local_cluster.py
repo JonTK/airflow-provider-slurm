@@ -850,8 +850,8 @@ class TestHookAdvanced:
         # Wait for failing job (expect error)
         try:
             slurm_hook.wait_for_job(failing_id, timeout=30)
-        except Exception:
-            pass  # Expected to fail
+        except Exception as exc:
+            logger.info("Expected failure for job %s: %s", failing_id, exc)
 
         # Cleanup job should still complete
         state = slurm_hook.wait_for_job(cleanup_id, timeout=30)
@@ -883,8 +883,8 @@ class TestHookAdvanced:
 
         try:
             slurm_hook.wait_for_job(failing_id, timeout=30)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.info("Expected failure for job %s: %s", failing_id, exc)
 
         state = slurm_hook.wait_for_job(recovery_id, timeout=30)
         assert state == "COMPLETED"
