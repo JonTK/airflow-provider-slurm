@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.decorators import task
+
 from airflow_provider_slurm.hooks.slurm_hook import SlurmHook
 from airflow_provider_slurm.operators.slurm import SlurmOperator
 
@@ -32,7 +33,6 @@ with DAG(
     catchup=False,
     tags=["slurm", "array", "hpc", "example"],
 ) as dag:
-
     # Example 1: Basic Array Job
     basic_array = SlurmOperator(
         task_id="basic_array_job",
@@ -150,7 +150,7 @@ echo "Task ${SLURM_ARRAY_TASK_ID} succeeded"
         completed = result["array_status"]["completed"]
         failed = result["array_status"]["failed"]
 
-        print(f"Array job results:")
+        print("Array job results:")
         print(f"  Total tasks: {total}")
         print(f"  Completed: {completed}")
         print(f"  Failed: {failed}")
@@ -179,7 +179,7 @@ echo "Task ${SLURM_ARRAY_TASK_ID} succeeded"
         """Process data in batches using array job."""
         hook = SlurmHook(slurm_conn_id="slurm_default")
 
-        script = f"""#!/bin/bash
+        script = """#!/bin/bash
 echo "Processing batch ${{SLURM_ARRAY_TASK_ID}}"
 
 # In real scenario, would process actual data

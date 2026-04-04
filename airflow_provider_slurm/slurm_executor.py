@@ -59,11 +59,17 @@ class SlurmExecutor(BaseExecutor):
         # State tracking
         self.last_sync_time: float = 0.0
         # Override base class set with dict for job metadata
-        self.running: Dict[TaskInstanceKey, Dict[str, Any]] = {}  # type: ignore[assignment]  # noqa: E501
+        self.running: Dict[TaskInstanceKey, Dict[str, Any]] = {}  # noqa: E501
 
         logger.info("Initialized SlurmExecutor")
 
-    def change_state(self, key, state, info=None, remove_running=True) -> None:
+    def change_state(
+        self,
+        key: TaskInstanceKey,
+        state: Any,
+        info: Any = None,
+        remove_running: bool = True,
+    ) -> None:
         """Override to handle dict-based self.running instead of set."""
         if remove_running:
             try:
@@ -308,9 +314,11 @@ class SlurmExecutor(BaseExecutor):
                 script = self._build_supervisor_script(workload)
 
                 # Build job parameters
-                job_spec, array_spec, dependency_spec = (
-                    self._build_job_spec_from_workload(workload, config)
-                )
+                (
+                    job_spec,
+                    array_spec,
+                    dependency_spec,
+                ) = self._build_job_spec_from_workload(workload, config)
                 job_spec["script"] = script
 
                 # Submit to Slurm
@@ -346,7 +354,7 @@ class SlurmExecutor(BaseExecutor):
                 self.fail(key)
 
     def _build_supervisor_script(self, workload: "workloads.ExecuteTask") -> str:
-        """Build a bash script that launches the Airflow task supervisor on a compute node."""
+        """Build a script to launch the Airflow supervisor on a node."""
         ti = workload.ti
 
         # Determine the execution API server URL
@@ -393,7 +401,8 @@ class SlurmExecutor(BaseExecutor):
                 "from airflow.sdk.execution_time.supervisor import supervise",
                 "from airflow.executors.workloads import ExecuteTask",
                 "",
-                f'workload = ExecuteTask.model_validate_json(open("{workload_file}").read())',
+                "workload = ExecuteTask.model_validate_json("
+                f'open("{workload_file}").read())',
                 "exit_code = supervise(",
                 "    ti=workload.ti,",
                 "    dag_rel_path=workload.dag_rel_path,",
@@ -426,7 +435,11 @@ class SlurmExecutor(BaseExecutor):
         job_name = f"airflow-{dag_id}-{task_id}-{run_id_hash}-{ti.try_number}"
         if len(job_name) > 256:
             max_id_length = (256 - 20) // 2
-            job_name = f"airflow-{dag_id[:max_id_length]}-{task_id[:max_id_length]}-{run_id_hash}-{ti.try_number}"
+            job_name = (
+                f"airflow-{dag_id[:max_id_length]}"
+                f"-{task_id[:max_id_length]}"
+                f"-{run_id_hash}-{ti.try_number}"
+            )
 
         # Determine log path
         base_log_folder = conf.get("logging", "base_log_folder")
@@ -590,7 +603,8 @@ class SlurmExecutor(BaseExecutor):
 
         # Exclusive allocation
         if config.get("exclusive"):
-            # Use "shared" field (works across API versions; "exclusive" deprecated in v0.0.42+)
+            # Use "shared" field (works across API versions;
+            # "exclusive" deprecated in v0.0.42+)
             job_params["shared"] = ["none"]
 
         # Node list specification

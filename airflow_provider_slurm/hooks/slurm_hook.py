@@ -14,16 +14,14 @@ with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     try:
         # Airflow 3.x
-        from airflow.hooks.base import BaseHook  # type: ignore[import-untyped]
-    except ImportError:
+        from airflow.hooks.base import BaseHook
+    except (ImportError, AttributeError):
         try:
             # Airflow 2.x
-            from airflow.hooks.base_hook import (
-                BaseHook,  # type: ignore[import-untyped, no-redef]
-            )
+            from airflow.hooks.base_hook import BaseHook  # noqa: F811
         except ImportError:
-            # Fallback for older versions
-            from airflow.hooks.base import BaseHook  # type: ignore[import-untyped, no-redef]
+            # Fallback
+            from airflow.hooks.base import BaseHook  # noqa: F811
 
 from airflow_provider_slurm.exceptions import SlurmAPIError, SlurmConfigurationError
 from airflow_provider_slurm.slurm_api_client import SlurmAPIClient
@@ -186,7 +184,7 @@ class SlurmHook(BaseHook):
         dependency: Optional[str] = None,
         **kwargs: Any,
     ) -> int:
-        """Submit a job to Slurm.
+        r"""Submit a job to Slurm.
 
         Args:
             script: Bash script content to execute
@@ -206,7 +204,9 @@ class SlurmHook(BaseHook):
             nodes: Number of nodes to allocate (Slurm -N flag)
             ntasks_per_node: Number of tasks per node (Slurm --ntasks-per-node flag)
             exclusive: Allocate nodes exclusively (Slurm --exclusive flag)
-            nodelist: Specific nodes to target (Slurm --nodelist flag, e.g., "node[01-04]", "gpu001,gpu002")
+            nodelist: Specific nodes to target
+                (Slurm --nodelist flag,
+                e.g., "node[01-04]", "gpu001,gpu002")
             array: Array specification (e.g., "0-99", "1-100:2", "0-99%10")
             dependency: Dependency specification (e.g., "afterok:12345")
             **kwargs: Additional job parameters
@@ -294,7 +294,8 @@ class SlurmHook(BaseHook):
         if ntasks_per_node is not None:
             job_params["tasks_per_node"] = ntasks_per_node
         if exclusive:
-            # Use "shared" field (works across API versions; "exclusive" deprecated in v0.0.42+)
+            # Use "shared" field (works across API versions;
+            # "exclusive" deprecated in v0.0.42+)
             job_params["shared"] = ["none"]
         if nodelist:
             # Slurm REST API uses "required_nodes" field (list of node names)
@@ -367,7 +368,8 @@ class SlurmHook(BaseHook):
         # Convert Sequence to List for API client
         job_ids_list = list(job_ids) if job_ids is not None else None
         result = client.get_jobs(job_ids=job_ids_list)
-        return result.get("jobs", [])
+        jobs: List[Dict[str, Any]] = result.get("jobs", [])
+        return jobs
 
     def cancel_job(self, job_id: int) -> bool:
         """Cancel a running job.
@@ -410,10 +412,12 @@ class SlurmHook(BaseHook):
             if job_info is None:
                 raise SlurmAPIError(f"Job {job_id} not found")
 
-            state = job_info.get("job_state", "UNKNOWN")
+            raw_state = job_info.get("job_state", "UNKNOWN")
             # Slurm REST API v0.0.41+ returns job_state as a list
-            if isinstance(state, list):
-                state = state[0] if state else "UNKNOWN"
+            if isinstance(raw_state, list):
+                state: str = raw_state[0] if raw_state else "UNKNOWN"
+            else:
+                state = str(raw_state)
 
             # Terminal states
             if state == "COMPLETED":
@@ -526,7 +530,8 @@ class SlurmHook(BaseHook):
                 if fail_on_error:
                     raise SlurmAPIError(
                         f"Array job {job_id} failed: "
-                        f"{array_status['failed']}/{array_status['total_tasks']} tasks failed"
+                        f"{array_status['failed']}/"
+                        f"{array_status['total_tasks']} tasks failed"
                     )
                 else:
                     logger.warning(f"Array job {job_id} failed, but continuing")
@@ -541,7 +546,8 @@ class SlurmHook(BaseHook):
                 else:
                     logger.warning(
                         f"Array job {job_id} partially completed "
-                        f"({array_status['completed']} succeeded, {array_status['failed']} failed)"
+                        f"({array_status['completed']} succeeded, "
+                        f"{array_status['failed']} failed)"
                     )
                     return array_status
 

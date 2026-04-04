@@ -14,7 +14,7 @@ repos:
       - id: mixed-line-ending
 
   - repo: https://github.com/psf/black
-    rev: 23.12.0
+    rev: 26.3.1
     hooks:
       - id: black
         language_version: python3
@@ -29,16 +29,15 @@ repos:
     rev: 6.1.0
     hooks:
       - id: flake8
-        args: ['--max-line-length=88', '--extend-ignore=E203,W503', '--per-file-ignores=examples/*:E501 D,test_*.py:E402 E501 F401 F541 E722 D B,*_test.py:E402 E501 F401 F541 D B,verify_script_format.py:E402 F541 D,tests/integration/*:B']
+        args: ['--max-line-length=88', '--extend-ignore=E203,W503', '--per-file-ignores=examples/*:E501 D,test_*.py:E402 E501 F401 F541 E722 D B,*_test.py:E402 E501 F401 F541 D B,verify_script_format.py:E402 F541 D,tests/integration/*:B D E501 F541,tests/utils/*:D,test_airflow_home/*:D E501']
         additional_dependencies:
           - flake8-docstrings
           - flake8-bugbear
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.7.1
+    rev: v1.15.0
     hooks:
       - id: mypy
         additional_dependencies:
           - types-requests
-          - apache-airflow-providers-common-sql
-        exclude: ^(tests/|docs/|examples/|test_.*\.py$|.*_test\.py$|verify_script_format\.py$)
+        exclude: ^(tests/|docs/|examples/|test_.*\.py$|.*_test\.py$|verify_script_format\.py$|test_airflow_home/)

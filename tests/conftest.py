@@ -156,7 +156,7 @@ def mock_task_instance():
 
 @pytest.fixture
 def executor_config_basic():
-    """Basic executor configuration for Slurm jobs.
+    """Return basic executor configuration for Slurm jobs.
 
     Returns:
         dict: Basic resource configuration
@@ -313,7 +313,7 @@ def mock_slurm_api_success(mock_token_manager):
 
 @pytest.fixture
 def airflow_command():
-    """Standard Airflow task execution command.
+    """Return standard Airflow task execution command.
 
     Returns:
         list[str]: Command to run an Airflow task

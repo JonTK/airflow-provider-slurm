@@ -34,7 +34,6 @@ with DAG(
     catchup=False,
     tags=["slurm", "dependencies", "example"],
 ) as dag:
-
     # ============================================================================
     # Pattern 1: Linear Pipeline (Sequential Processing)
     # ============================================================================

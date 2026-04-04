@@ -19,7 +19,6 @@ with DAG(
     catchup=False,
     tags=["test", "slurm"],
 ) as dag:
-
     # Basic task — should submit to Slurm and complete
     basic_task = BashOperator(
         task_id="basic_task",

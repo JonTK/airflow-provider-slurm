@@ -150,7 +150,7 @@ def mock_airflow_connection(local_token, api_version):
                 SlurmAPIClient,
                 "__init__",
                 wraps=SlurmAPIClient.__init__,
-            ) as mock_init:
+            ):
                 original_init = SlurmAPIClient.__init__
 
                 def patched_init(

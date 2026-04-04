@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class SlurmOperator(BaseOperator):
-    """Submit a job to Slurm and optionally wait for completion.
+    r"""Submit a job to Slurm and optionally wait for completion.
 
     This operator uses SlurmHook to submit a bash script as a Slurm job.
     It can either return immediately after submission or wait for the job
@@ -40,7 +40,9 @@ class SlurmOperator(BaseOperator):
         nodes: Number of nodes to allocate (Slurm -N flag)
         ntasks_per_node: Number of tasks per node (Slurm --ntasks-per-node flag)
         exclusive: Allocate nodes exclusively (Slurm --exclusive flag)
-        nodelist: Specific nodes to target (Slurm --nodelist flag, e.g., "node[01-04]", "gpu001,gpu002")
+        nodelist: Specific nodes to target
+            (Slurm --nodelist flag,
+            e.g., "node[01-04]", "gpu001,gpu002")
         array: Array job specification (e.g., "0-99", "1-100:2", "0-99%10")
         array_fail_on_error: For array jobs, fail if any task fails
         dependency: Dependency specification (e.g., "afterok:12345") - templatable
@@ -260,7 +262,7 @@ class SlurmOperator(BaseOperator):
         hook = SlurmHook(slurm_conn_id=self.slurm_conn_id)
 
         # Build submission log message
-        log_parts = [f"Submitting Slurm"]
+        log_parts = ["Submitting Slurm"]
         if self.array:
             log_parts.append(f"array job: {self.job_name} ({self.array})")
         else:
@@ -334,7 +336,8 @@ class SlurmOperator(BaseOperator):
                 result["array_task_count"] = array_status.get("total_tasks", 0)
                 logger.info(
                     f"Array job {job_id} completed: "
-                    f"{array_status['completed']}/{array_status['total_tasks']} tasks succeeded"
+                    f"{array_status['completed']}/"
+                    f"{array_status['total_tasks']} tasks succeeded"
                 )
             else:
                 logger.info(f"Waiting for job {job_id} to complete...")

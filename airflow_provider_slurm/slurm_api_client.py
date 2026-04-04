@@ -206,7 +206,7 @@ class SlurmAPIClient:
                     if start > end:
                         return False, f"Invalid range: start ({start}) > end ({end})"
                     if start < 0:
-                        return False, f"Array indices must be non-negative"
+                        return False, "Array indices must be non-negative"
                 return True, None
 
         return (
@@ -381,7 +381,9 @@ class SlurmAPIClient:
 
             >>> # Submit array job with dependency
             >>> client.submit_job(job_spec, array="0-99", dependency="afterok:12345")
-            {'job_id': 12346, 'array': '0-99', 'array_task_count': 100, 'dependency': 'afterok:12345'}
+            {'job_id': 12346, 'array': '0-99',
+             'array_task_count': 100,
+             'dependency': 'afterok:12345'}
         """
         # Validate array specification if provided
         if array:
@@ -437,7 +439,7 @@ class SlurmAPIClient:
             result["dependency"] = dependency
 
         # Build success log message
-        log_parts = [f"Successfully submitted"]
+        log_parts = ["Successfully submitted"]
         if array:
             log_parts.append(
                 f"array job {job_id} with {result['array_task_count']} tasks"
@@ -593,7 +595,8 @@ class SlurmAPIClient:
                 - running: Number of running tasks
                 - pending: Number of pending tasks
                 - failed: Number of failed tasks
-                - state: Aggregated state (PENDING/RUNNING/COMPLETED/PARTIALLY_COMPLETED/FAILED)
+                - state: Aggregated state
+                    (PENDING/RUNNING/COMPLETED/PARTIALLY_COMPLETED/FAILED)
                 - tasks: Optional list of individual task details
 
         Raises:
