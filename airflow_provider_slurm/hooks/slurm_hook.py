@@ -18,11 +18,12 @@ with warnings.catch_warnings():
     except (ImportError, AttributeError):
         try:
             # Airflow 2.x
-            from airflow.hooks.base_hook import BaseHook  # noqa: F811
-        except ImportError:
-            # Fallback
-            from airflow.hooks.base import (  # noqa: F811
+            from airflow.hooks.base_hook import (  # type: ignore[import-not-found,no-redef]  # noqa: E501,F811
                 BaseHook,
+            )
+        except ImportError:
+            from airflow.hooks.base import (  # noqa: F811
+                BaseHook,  # type: ignore[no-redef]
             )
 
 from airflow_provider_slurm.exceptions import SlurmAPIError, SlurmConfigurationError

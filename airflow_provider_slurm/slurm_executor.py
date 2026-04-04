@@ -14,9 +14,9 @@ from airflow.executors.base_executor import BaseExecutor
 from airflow.models.taskinstance import TaskInstance, TaskInstanceKey
 
 try:
-    from airflow.executors import workloads  # Airflow 3.x
-except ImportError:
-    workloads = None  # type: ignore[assignment]  # Airflow 2.x
+    from airflow.executors import workloads  # type: ignore[attr-defined]
+except (ImportError, AttributeError):
+    workloads = None  # type: ignore[assignment]
 
 from airflow_provider_slurm.exceptions import (
     SlurmAPIError,
@@ -63,9 +63,7 @@ class SlurmExecutor(BaseExecutor):
         # State tracking
         self.last_sync_time: float = 0.0
         # Override base class set with dict for job metadata
-        self.running: Dict[  # type: ignore[assignment]
-            TaskInstanceKey, Dict[str, Any]
-        ] = {}
+        self.running: Dict[TaskInstanceKey, Dict[str, Any]] = {}  # type: ignore[assignment]  # noqa: E501
 
         logger.info("Initialized SlurmExecutor")
 
