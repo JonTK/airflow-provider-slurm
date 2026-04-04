@@ -13,6 +13,11 @@ from airflow.configuration import conf
 from airflow.executors.base_executor import BaseExecutor
 from airflow.models.taskinstance import TaskInstance, TaskInstanceKey
 
+try:
+    from airflow.executors import workloads  # type: ignore[attr-defined]
+except (ImportError, AttributeError):
+    workloads = None  # type: ignore[assignment]
+
 from airflow_provider_slurm.exceptions import (
     SlurmAPIError,
     SlurmConfigurationError,
@@ -61,6 +66,21 @@ class SlurmExecutor(BaseExecutor):
         self.running: Dict[TaskInstanceKey, Dict[str, Any]] = {}  # type: ignore[assignment]  # noqa: E501
 
         logger.info("Initialized SlurmExecutor")
+
+    def change_state(
+        self,
+        key: TaskInstanceKey,
+        state: Any,
+        info: Any = None,
+        remove_running: bool = True,
+    ) -> None:
+        """Override to handle dict-based self.running instead of set."""
+        if remove_running:
+            try:
+                del self.running[key]
+            except KeyError:
+                logger.debug(f"Could not find key: {key}")
+        self.event_buffer[key] = state, info
 
     def start(self) -> None:
         """Start the executor and validate configuration."""
@@ -135,14 +155,16 @@ class SlurmExecutor(BaseExecutor):
             f"partition={self.default_partition}"
         )
 
-    def _convert_time_to_seconds(self, time_value: Union[str, int]) -> int:
-        """Convert time string or integer to seconds.
+    def _convert_time_to_minutes(self, time_value: Union[str, int]) -> int:
+        """Convert time string or integer to minutes for Slurm REST API.
+
+        The Slurm REST API interprets the time_limit integer as minutes.
 
         Args:
-            time_value: Time as string (HH:MM:SS, MM:SS) or integer (seconds)
+            time_value: Time as string (HH:MM:SS, MM:SS) or integer (minutes)
 
         Returns:
-            Time in seconds as integer
+            Time in minutes as integer
         """
         if isinstance(time_value, int):
             return time_value
@@ -153,16 +175,21 @@ class SlurmExecutor(BaseExecutor):
                 parts = time_value.split(":")
                 if len(parts) == 3:  # HH:MM:SS
                     hours, minutes, seconds = map(int, parts)
-                    return hours * 3600 + minutes * 60 + seconds
+                    total_minutes = hours * 60 + minutes
+                    if seconds > 0:
+                        total_minutes += 1  # Round up partial minutes
+                    return total_minutes
                 elif len(parts) == 2:  # MM:SS
                     minutes, seconds = map(int, parts)
-                    return minutes * 60 + seconds
+                    if seconds > 0:
+                        minutes += 1
+                    return minutes
             else:
-                # Assume it's already in seconds as string
+                # Assume it's already in minutes as string
                 return int(time_value)
 
         # Fallback
-        return 3600  # 1 hour default
+        return 60  # 1 hour default
 
     def _validate_shared_filesystem(self) -> None:
         """Verify log directory is accessible and writable."""
@@ -196,26 +223,69 @@ class SlurmExecutor(BaseExecutor):
             command: Command to execute
             queue: Airflow queue (can map to Slurm partition)
             executor_config: Task-specific Slurm configuration
+                - array: Array specification (e.g., "0-99", "1-100:2")
+                - dependency: Dependency specification (e.g., "afterok:12345")
+                - All other standard Slurm parameters
         """
         try:
-            logger.info(f"Submitting task {key} to Slurm")
+            config = executor_config or {}
+            array_spec = config.get("array")
+            dependency_spec = config.get("dependency")
+
+            # Build log message
+            log_parts = [f"Submitting task {key} to Slurm"]
+            if array_spec:
+                log_parts.append(f"(array: {array_spec})")
+            if dependency_spec:
+                log_parts.append(f"(dependency: {dependency_spec})")
+            logger.info(" ".join(log_parts))
 
             # Build job specification
-            job_spec = self._build_job_spec(key, command, queue, executor_config)
+            job_spec, array, dependency = self._build_job_spec(
+                key, command, queue, executor_config
+            )
 
             # Submit to Slurm
             assert self.slurm_client is not None, "Executor not started"
-            result = self.slurm_client.submit_job(job_spec)
+            result = self.slurm_client.submit_job(
+                job_spec, array=array, dependency=dependency
+            )
             job_id = result.get("job_id")
 
             if job_id:
-                # Track the job
-                self.running[key] = {
+                # Track the job with array and dependency metadata
+                job_metadata: Dict[str, Any] = {
                     "slurm_job_id": job_id,
                     "command": command,
                     "submit_time": datetime.now(),
                 }
-                logger.info(f"Task {key} submitted as Slurm job {job_id}")
+
+                # Store array information if this is an array job
+                if array:
+                    job_metadata["array_spec"] = array
+                    job_metadata["array_task_count"] = result.get("array_task_count", 0)
+                    job_metadata["is_array"] = True
+                else:
+                    job_metadata["is_array"] = False
+
+                # Store dependency information if specified
+                if dependency:
+                    job_metadata["dependency"] = dependency
+
+                # Build success log message
+                success_parts = [f"Task {key} submitted as Slurm"]
+                if array:
+                    success_parts.append(
+                        f"array job {job_id} ({job_metadata['array_task_count']} tasks)"
+                    )
+                else:
+                    success_parts.append(f"job {job_id}")
+                if dependency:
+                    success_parts.append(f"(dependency: {dependency})")
+
+                logger.info(" ".join(success_parts))
+
+                self.running[key] = job_metadata
             else:
                 raise SlurmJobSubmissionError(f"No job_id returned for task {key}")
 
@@ -223,13 +293,244 @@ class SlurmExecutor(BaseExecutor):
             logger.error(f"Failed to submit task {key}: {e}")
             self.fail(key)
 
+    def _process_workloads(self, wls: "Sequence[workloads.All]") -> None:
+        """Process workloads by submitting them to Slurm.
+
+        This is the Airflow 3.x executor API. Each workload contains a
+        TaskInstance with all the metadata needed to run the task on a
+        compute node via the Airflow supervisor.
+        """
+        for workload in wls:
+            if not isinstance(workload, workloads.ExecuteTask):
+                logger.warning(
+                    f"Ignoring unknown workload type: {type(workload).__name__}"
+                )
+                continue
+
+            ti = workload.ti
+            key = ti.key
+            config = ti.executor_config or {}
+
+            try:
+                logger.info(f"Processing workload for task {key}")
+
+                # Build the supervisor command that will run on the compute node
+                script = self._build_supervisor_script(workload)
+
+                # Build job parameters
+                (
+                    job_spec,
+                    array_spec,
+                    dependency_spec,
+                ) = self._build_job_spec_from_workload(workload, config)
+                job_spec["script"] = script
+
+                # Submit to Slurm
+                assert self.slurm_client is not None, "Executor not started"
+                result = self.slurm_client.submit_job(
+                    job_spec, array=array_spec, dependency=dependency_spec
+                )
+                job_id = result.get("job_id")
+
+                if job_id:
+                    job_metadata: Dict[str, Any] = {
+                        "slurm_job_id": job_id,
+                        "submit_time": datetime.now(),
+                        "is_array": bool(array_spec),
+                        "workload": workload,
+                    }
+                    if array_spec:
+                        job_metadata["array_spec"] = array_spec
+                        job_metadata["array_task_count"] = result.get(
+                            "array_task_count", 0
+                        )
+                    if dependency_spec:
+                        job_metadata["dependency"] = dependency_spec
+
+                    self.running[key] = job_metadata
+                    del self.queued_tasks[key]
+                    logger.info(f"Task {key} submitted as Slurm job {job_id}")
+                else:
+                    raise SlurmJobSubmissionError(f"No job_id returned for task {key}")
+
+            except Exception as e:
+                logger.error(f"Failed to submit task {key}: {e}")
+                self.fail(key)
+
+    def _build_supervisor_script(self, workload: "workloads.ExecuteTask") -> str:
+        """Build a script to launch the Airflow supervisor on a node."""
+        ti = workload.ti
+
+        # Determine the execution API server URL
+        base_url = conf.get("api", "base_url", fallback="/")
+        if base_url.startswith("/"):
+            import socket
+
+            hostname = socket.getfqdn()
+            base_url = f"http://{hostname}:8080{base_url}"
+        execution_api_url = f"{base_url.rstrip('/')}/execution/"
+        execution_api_url = conf.get(
+            "core", "execution_api_server_url", fallback=execution_api_url
+        )
+
+        # Write workload to a file on shared filesystem so compute node can read it
+        workload_dir = os.path.join(self.airflow_home, "workloads")
+        os.makedirs(workload_dir, exist_ok=True)
+        workload_file = os.path.join(workload_dir, f"{ti.id}.json")
+        with open(workload_file, "w") as f:
+            f.write(workload.model_dump_json())
+
+        lines = [
+            "#!/bin/bash",
+            "set -euo pipefail",
+            "",
+        ]
+
+        # Activate virtual environment if configured
+        if self.airflow_venv and not self.default_container:
+            lines.extend(
+                [
+                    "# Activate virtual environment",
+                    f"source {self.airflow_venv}/bin/activate",
+                    "",
+                ]
+            )
+
+        # Run the task using the Airflow 3.x supervisor
+        lines.extend(
+            [
+                "# Execute Airflow task via supervisor",
+                "python3 << 'PYEOF'",
+                "import sys",
+                "from airflow.sdk.execution_time.supervisor import supervise",
+                "from airflow.executors.workloads import ExecuteTask",
+                "",
+                "workload = ExecuteTask.model_validate_json("
+                f'open("{workload_file}").read())',
+                "exit_code = supervise(",
+                "    ti=workload.ti,",
+                "    dag_rel_path=workload.dag_rel_path,",
+                "    bundle_info=workload.bundle_info,",
+                "    token=workload.token,",
+                f'    server="{execution_api_url}",',
+                "    log_path=workload.log_path,",
+                ")",
+                "sys.exit(exit_code)",
+                "PYEOF",
+            ]
+        )
+
+        return "\n".join(lines)
+
+    def _build_job_spec_from_workload(
+        self,
+        workload: "workloads.ExecuteTask",
+        config: Dict[str, Any],
+    ) -> tuple[Dict[str, Any], Optional[str], Optional[str]]:
+        """Build Slurm job specification from an Airflow 3.x workload."""
+        ti = workload.ti
+        array_spec = config.get("array")
+        dependency_spec = config.get("dependency")
+
+        # Build job name
+        run_id_hash = hashlib.sha256(ti.run_id.encode()).hexdigest()[:8]
+        dag_id = ti.dag_id.replace("/", "_").replace(".", "_")
+        task_id = ti.task_id.replace("/", "_").replace(".", "_")
+        job_name = f"airflow-{dag_id}-{task_id}-{run_id_hash}-{ti.try_number}"
+        if len(job_name) > 256:
+            max_id_length = (256 - 20) // 2
+            job_name = (
+                f"airflow-{dag_id[:max_id_length]}"
+                f"-{task_id[:max_id_length]}"
+                f"-{run_id_hash}-{ti.try_number}"
+            )
+
+        # Determine log path
+        base_log_folder = conf.get("logging", "base_log_folder")
+        log_path = os.path.join(
+            base_log_folder,
+            "dags",
+            ti.dag_id,
+            ti.task_id,
+            ti.run_id,
+            f"{ti.try_number}.log",
+        )
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+
+        # Build job parameters
+        job_params: Dict[str, Any] = {
+            "name": job_name,
+            "partition": config.get("partition", self.default_partition),
+            "tasks": 1,
+            "cpus_per_task": config.get("cpus_per_task", self.default_cpus),
+            "memory_per_node": config.get("mem", self.default_mem),
+            "time_limit": self._convert_time_to_minutes(
+                config.get("time_limit", self.default_time_limit)
+            ),
+            "current_working_directory": config.get("working_dir", self.airflow_home),
+            "environment": self._build_workload_environment(workload),
+            "standard_output": log_path,
+            "standard_error": log_path,
+        }
+
+        # Optional parameters
+        if self.default_account or config.get("account"):
+            job_params["account"] = config.get("account", self.default_account)
+        if config.get("qos"):
+            job_params["qos"] = config["qos"]
+        if config.get("gres"):
+            gres_value = config["gres"]
+            if not gres_value.startswith("gres/"):
+                gres_value = f"gres/{gres_value}"
+            job_params["tres_per_node"] = gres_value
+        if config.get("constraint"):
+            job_params["constraints"] = config["constraint"]
+        if config.get("nodes") is not None:
+            job_params["minimum_nodes"] = config["nodes"]
+        if config.get("ntasks_per_node") is not None:
+            job_params["tasks_per_node"] = config["ntasks_per_node"]
+        if config.get("exclusive"):
+            job_params["shared"] = ["none"]
+        if config.get("nodelist"):
+            job_params["required_nodes"] = [config["nodelist"]]
+
+        job_spec = {"job": job_params}
+        return job_spec, array_spec, dependency_spec
+
+    def _build_workload_environment(
+        self, workload: "workloads.ExecuteTask"
+    ) -> List[str]:
+        """Build environment variables for a workload execution.
+
+        Returns a list of KEY=value strings as required by the Slurm REST API.
+        """
+        env = os.environ.copy()
+
+        if "PATH" not in env:
+            env["PATH"] = "/usr/local/bin:/usr/bin:/bin"
+        if "USER" not in env:
+            env["USER"] = os.environ.get("USER", "airflow")
+        if "HOME" not in env:
+            env["HOME"] = os.path.expanduser("~")
+
+        env.update(
+            {
+                "AIRFLOW_HOME": self.airflow_home,
+                "AIRFLOW__CORE__DAGS_FOLDER": conf.get("core", "dags_folder"),
+                "AIRFLOW__CORE__EXECUTOR": "LocalExecutor",
+            }
+        )
+
+        # Slurm REST API requires environment as array of "KEY=value" strings
+        return [f"{k}={v}" for k, v in env.items()]
+
     def _build_job_spec(
         self,
         key: TaskInstanceKey,
         command: Sequence[str],
         queue: Optional[str],
         executor_config: Optional[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+    ) -> tuple[Dict[str, Any], Optional[str], Optional[str]]:
         """Build Slurm job specification for a task.
 
         Args:
@@ -239,9 +540,13 @@ class SlurmExecutor(BaseExecutor):
             executor_config: Task-specific configuration
 
         Returns:
-            Job specification dictionary
+            Tuple of (job_spec_dict, array_spec_or_none, dependency_spec_or_none)
         """
         config = executor_config or {}
+
+        # Extract array and dependency parameters (don't include in job params)
+        array_spec = config.get("array")
+        dependency_spec = config.get("dependency")
 
         # Build job name
         job_name = self._build_job_name(key)
@@ -259,7 +564,7 @@ class SlurmExecutor(BaseExecutor):
             "tasks": 1,  # Single task per job
             "cpus_per_task": config.get("cpus_per_task", self.default_cpus),
             "memory_per_node": config.get("mem", self.default_mem),
-            "time_limit": self._convert_time_to_seconds(
+            "time_limit": self._convert_time_to_minutes(
                 config.get("time_limit", self.default_time_limit)
             ),
             "current_working_directory": config.get("working_dir", self.airflow_home),
@@ -280,10 +585,43 @@ class SlurmExecutor(BaseExecutor):
         if container:
             job_params["container"] = container
 
-        return {
+        # GRES (Generic RESource) support - for GPU, MIC, etc.
+        if config.get("gres"):
+            # Slurm REST API uses tres_per_node for GRES (e.g., "gpu:1" -> "gres/gpu:1")
+            gres_value = config["gres"]
+            if not gres_value.startswith("gres/"):
+                gres_value = f"gres/{gres_value}"
+            job_params["tres_per_node"] = gres_value
+
+        # Node constraints for heterogeneous clusters
+        if config.get("constraint"):
+            job_params["constraints"] = config["constraint"]
+
+        # Node allocation
+        if config.get("nodes") is not None:
+            job_params["minimum_nodes"] = config["nodes"]
+
+        # Tasks per node
+        if config.get("ntasks_per_node") is not None:
+            job_params["tasks_per_node"] = config["ntasks_per_node"]
+
+        # Exclusive allocation
+        if config.get("exclusive"):
+            # Use "shared" field (works across API versions;
+            # "exclusive" deprecated in v0.0.42+)
+            job_params["shared"] = ["none"]
+
+        # Node list specification
+        if config.get("nodelist"):
+            # Slurm REST API uses "required_nodes" field (list of node names)
+            job_params["required_nodes"] = [config["nodelist"]]
+
+        job_spec = {
             "script": script,
             "job": job_params,
         }
+
+        return job_spec, array_spec, dependency_spec
 
     def _build_job_name(self, key: TaskInstanceKey) -> str:
         """Build Slurm job name that encodes task identity.
@@ -419,26 +757,29 @@ class SlurmExecutor(BaseExecutor):
         logger.debug(f"Syncing status for {len(self.running)} running tasks")
 
         try:
-            # Get all job IDs we're tracking
-            job_ids = [info["slurm_job_id"] for info in self.running.values()]
-
-            # Query Slurm for job statuses
             assert self.slurm_client is not None, "Executor not started"
-            result = self.slurm_client.get_jobs(job_ids=job_ids)
-            jobs = result.get("jobs", [])
-
-            # Build lookup by job ID
-            job_statuses = {job["job_id"]: job for job in jobs}
 
             # Update state for each tracked task
             for key, job_info in list(self.running.items()):
                 slurm_job_id = job_info["slurm_job_id"]
+                is_array = job_info.get("is_array", False)
 
-                if slurm_job_id in job_statuses:
-                    # Job found in active queue
-                    self._handle_job_state(key, job_statuses[slurm_job_id])
-                else:
-                    # Job not in active queue - check history or mark missing
+                try:
+                    if is_array:
+                        # For array jobs, get aggregated status
+                        array_status = self.slurm_client.get_array_status(slurm_job_id)
+                        self._handle_array_job_state(key, array_status)
+                    else:
+                        # For single jobs, get individual status
+                        job_data = self.slurm_client.get_job(slurm_job_id)
+                        if job_data:
+                            self._handle_job_state(key, job_data)
+                        else:
+                            # Job not found - check history or mark missing
+                            self._handle_missing_job(key, job_info)
+
+                except SlurmAPIError as e:
+                    logger.debug(f"Could not query status for job {slurm_job_id}: {e}")
                     self._handle_missing_job(key, job_info)
 
         except Exception as e:
@@ -447,6 +788,9 @@ class SlurmExecutor(BaseExecutor):
     def _handle_job_state(self, key: TaskInstanceKey, job_data: Dict[str, Any]) -> None:
         """Process Slurm job state and update Airflow task state."""
         state = job_data.get("job_state", "UNKNOWN")
+        # Slurm REST API v0.0.41+ returns job_state as a list
+        if isinstance(state, list):
+            state = state[0] if state else "UNKNOWN"
 
         logger.debug(f"Task {key} job {job_data['job_id']} in state {state}")
 
@@ -456,7 +800,13 @@ class SlurmExecutor(BaseExecutor):
 
         # Job completed
         if state == "COMPLETED":
-            exit_code = job_data.get("exit_code", 0)
+            raw_exit_code = job_data.get("exit_code", 0)
+            # Slurm REST API v0.0.41+ returns exit_code as a dict
+            if isinstance(raw_exit_code, dict):
+                rc = raw_exit_code.get("return_code", {})
+                exit_code = rc.get("number", 0) if isinstance(rc, dict) else rc
+            else:
+                exit_code = raw_exit_code
             if exit_code == 0:
                 self.success(key)
                 logger.info(f"Task {key} succeeded")
@@ -474,15 +824,81 @@ class SlurmExecutor(BaseExecutor):
             "NODE_FAIL",
             "OUT_OF_MEMORY",
             "PREEMPTED",
+            "DEPENDENCY_NEVER_SATISFIED",
         ]:
             reason = job_data.get("state_reason", "unknown")
             self.fail(key)
-            logger.error(f"Task {key} failed: {state} - {reason}")
+            if state == "DEPENDENCY_NEVER_SATISFIED":
+                logger.error(
+                    f"Task {key} failed: dependency not satisfied "
+                    f"(dependent job may have failed) - {reason}"
+                )
+            else:
+                logger.error(f"Task {key} failed: {state} - {reason}")
             del self.running[key]
             return
 
         # Unknown state
         logger.warning(f"Unknown Slurm state '{state}' for task {key}")
+
+    def _handle_array_job_state(
+        self, key: TaskInstanceKey, array_status: Dict[str, Any]
+    ) -> None:
+        """Process aggregated array job state and update Airflow task state.
+
+        Args:
+            key: Task instance key
+            array_status: Aggregated array status from get_array_status()
+        """
+        state = array_status.get("state", "UNKNOWN")
+        job_id = array_status.get("job_id")
+        total_tasks = array_status.get("total_tasks", 0)
+        completed = array_status.get("completed", 0)
+        failed = array_status.get("failed", 0)
+        running = array_status.get("running", 0)
+
+        logger.debug(
+            f"Task {key} array job {job_id} in state {state} "
+            f"({completed}/{total_tasks} completed, {failed} failed, {running} running)"
+        )
+
+        # States that don't require action (still processing)
+        if state in ["PENDING", "RUNNING"]:
+            return
+
+        # All tasks completed successfully
+        if state == "COMPLETED":
+            self.success(key)
+            logger.info(
+                f"Task {key} array job {job_id} completed successfully "
+                f"({total_tasks} tasks)"
+            )
+            del self.running[key]
+            return
+
+        # Some tasks failed, some succeeded
+        if state == "PARTIALLY_COMPLETED":
+            # Mark task as failed since not all array tasks succeeded
+            self.fail(key)
+            logger.error(
+                f"Task {key} array job {job_id} partially completed: "
+                f"{completed} succeeded, {failed} failed"
+            )
+            del self.running[key]
+            return
+
+        # All tasks failed or job cancelled
+        if state in ["FAILED", "CANCELLED"]:
+            self.fail(key)
+            logger.error(
+                f"Task {key} array job {job_id} failed: {state} "
+                f"({failed}/{total_tasks} tasks failed)"
+            )
+            del self.running[key]
+            return
+
+        # Unknown state
+        logger.warning(f"Unknown array job state '{state}' for task {key}")
 
     def _handle_missing_job(
         self, key: TaskInstanceKey, job_info: Dict[str, Any]

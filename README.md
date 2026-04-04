@@ -82,6 +82,178 @@ with DAG(
     gpu_task()
 ```
 
+## Usage Examples
+
+### Job Arrays for High-Throughput Computing
+
+Submit hundreds or thousands of similar jobs efficiently using Slurm job arrays:
+
+```python
+from airflow_provider_slurm.operators.slurm import SlurmOperator
+
+# Submit 100 parallel tasks
+array_job = SlurmOperator(
+    task_id='batch_processing',
+    script='''#!/bin/bash
+echo "Processing task $SLURM_ARRAY_TASK_ID"
+python process.py --input data_${SLURM_ARRAY_TASK_ID}.csv
+''',
+    job_name='data_processing',
+    array='0-99',  # 100 tasks
+    partition='compute',
+    cpus_per_task=2,
+    mem='4G',
+    wait_for_completion=True,
+)
+```
+
+**Array with parallelism control:**
+
+```python
+# 1000 tasks, max 50 concurrent
+limited_array = SlurmOperator(
+    task_id='controlled_batch',
+    script='#!/bin/bash\npython process.py $SLURM_ARRAY_TASK_ID',
+    array='0-999%50',  # Limit to 50 concurrent tasks
+    array_fail_on_error=False,  # Continue even if some tasks fail
+    wait_for_completion=True,
+)
+```
+
+### Job Dependencies
+
+Chain Slurm jobs together using native dependency specifications. Jobs won't start until their dependencies complete successfully:
+
+```python
+from airflow_provider_slurm.operators.slurm import SlurmOperator
+from airflow.decorators import task
+
+# Traditional approach with Operator
+preprocessing = SlurmOperator(
+    task_id='preprocess',
+    script='#!/bin/bash\npython preprocess.py',
+    job_name='data_preprocessing',
+    partition='compute',
+)
+
+# Dependent job uses XCom to get job_id
+@task
+def create_analysis_job(preprocessing_result):
+    analysis = SlurmOperator(
+        task_id='analysis',
+        script='#!/bin/bash\npython analyze.py',
+        job_name='data_analysis',
+        dependency=f"afterok:{preprocessing_result['job_id']}",  # Wait for success
+        partition='compute',
+    )
+    return analysis.execute({})
+
+preprocessing_result = preprocessing.execute({})
+analysis_result = create_analysis_job(preprocessing_result)
+```
+
+**Using templatable dependencies:**
+
+```python
+# Dependency field is templatable - use Jinja to get job_id from XCom
+analysis = SlurmOperator(
+    task_id='analysis',
+    script='#!/bin/bash\npython analyze.py',
+    job_name='analysis',
+    dependency="afterok:{{ task_instance.xcom_pull('preprocess') }}",
+    partition='compute',
+)
+```
+
+**Supported dependency types:**
+
+- `afterok:job_id` - Start after job completes successfully
+- `afterany:job_id` - Start after job ends (any exit status)
+- `afternotok:job_id` - Start after job fails
+- `aftercorr:job_id` - Start after corresponding array task completes
+- `singleton` - Only one job with this name runs at a time
+- `after:job_id` - Start after job starts (no exit status check)
+- `afterburstbuffer:job_id` - Start after burst buffer stage out completes
+
+**Complex dependencies with combinators:**
+
+```python
+# AND logic (all must complete) - use comma
+dependency="afterok:12345,afterok:12346"
+
+# OR logic (any must complete) - use question mark
+dependency="afterok:12345?afterok:12346"
+
+# Multiple job IDs for same type - use colon
+dependency="afterok:12345:12346:12347"
+```
+
+### GPU Computing
+
+```python
+from airflow.decorators import task
+
+@task(executor_config={
+    'partition': 'gpu',
+    'gres': 'gpu:2',  # Request 2 GPUs
+    'cpus_per_task': 8,
+    'mem': '32G',
+    'time_limit': '04:00:00',
+})
+def train_model():
+    import torch
+    # Your ML training code
+    return model_metrics
+```
+
+### Using SlurmHook for Direct Job Submission
+
+```python
+from airflow_provider_slurm.hooks.slurm_hook import SlurmHook
+
+hook = SlurmHook(slurm_conn_id='slurm_default')
+
+# Submit single job
+job_id = hook.submit_job(
+    script='#!/bin/bash\necho "Hello from Slurm"',
+    job_name='test_job',
+    partition='compute',
+    cpus_per_task=1,
+    mem='2G',
+)
+
+# Submit array job
+array_job_id = hook.submit_job(
+    script='#!/bin/bash\necho "Task $SLURM_ARRAY_TASK_ID"',
+    job_name='array_job',
+    array='0-9',
+    wait_for_completion=False,
+)
+
+# Monitor array job
+status = hook.get_array_status(array_job_id)
+print(f"Array: {status['completed']}/{status['total_tasks']} completed")
+
+# Wait for completion
+final_status = hook.wait_for_array(
+    array_job_id,
+    timeout=3600,
+    poll_interval=10,
+)
+```
+
+### Node Constraints for Heterogeneous Clusters
+
+```python
+@task(executor_config={
+    'constraint': 'haswell',  # Specific CPU architecture
+    'mem': '64G',
+})
+def compute_intensive_task():
+    # Your computation
+    pass
+```
+
 ## Configuration
 
 See [Configuration Guide](docs/configuration.md) for detailed options.
@@ -107,6 +279,8 @@ black . && isort . && flake8
 
 - [Installation Guide](docs/installation.md)
 - [Configuration Reference](docs/configuration.md)
+- [Job Arrays Tutorial](docs/job_arrays.md)
+- [Job Dependencies Tutorial](docs/tutorials/job_dependencies.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Contributing](CONTRIBUTING.md)
 

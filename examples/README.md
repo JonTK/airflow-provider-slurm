@@ -6,7 +6,7 @@ This directory contains comprehensive examples demonstrating various use cases a
 
 1. **Install the Slurm Executor**:
    ```bash
-   pip install airflow-slurm-executor
+   pip install airflow-provider-slurm
    ```
 
 2. **Configure Airflow** (see [Configuration Guide](#configuration) below)

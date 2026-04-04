@@ -8,6 +8,9 @@
 # Core executor code
 /airflow_provider_slurm/ @JonTK
 
+# Hooks
+/airflow_provider_slurm/hooks/ @JonTK
+
 # API client
 /airflow_provider_slurm/api*.py @JonTK
 /airflow_provider_slurm/client*.py @JonTK
