@@ -14,6 +14,7 @@ from tests.utils.cluster_helpers import (
 )
 
 
+
 def main():
     print("🧪 Fixed Script Format Test")
     print("-" * 30)
@@ -102,6 +103,7 @@ echo 'Script completed successfully'
     print("=" * 40)
 
     return success
+
 
 
 if __name__ == "__main__":

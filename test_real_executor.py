@@ -20,6 +20,7 @@ from tests.utils.cluster_helpers import (
 )
 
 
+
 def main():
     print("🧪 Testing Real SlurmExecutor")
     print("-" * 35)
@@ -144,6 +145,7 @@ def main():
                 print("=" * 40)
 
                 return True
+
 
 
 if __name__ == "__main__":

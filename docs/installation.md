@@ -135,8 +135,8 @@ The Airflow `AIRFLOW_HOME` directory should be accessible from compute nodes.
 - Airflow scheduler must reach slurmrestd API (default port 6820)
 - Compute nodes must access the shared filesystem
 - Firewall rules should allow:
-  - Scheduler → slurmrestd (TCP 6820)
-  - Scheduler ↔ Compute nodes (filesystem protocols: NFS, Lustre, etc.)
+  - Scheduler -> slurmrestd (TCP 6820)
+  - Scheduler <-> Compute nodes (filesystem protocols: NFS, Lustre, etc.)
 
 ## Next Steps
 

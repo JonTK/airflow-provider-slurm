@@ -14,6 +14,7 @@ from tests.utils.cluster_helpers import (
 )
 
 
+
 def main():
     print("🔍 Quick Diagnostic Test")
     print("-" * 30)
@@ -117,6 +118,7 @@ def main():
     print("=" * 40)
 
     return True
+
 
 
 if __name__ == "__main__":

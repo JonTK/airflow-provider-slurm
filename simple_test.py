@@ -15,6 +15,7 @@ from tests.utils.cluster_helpers import (
 )
 
 
+
 def main():
     print("🧪 Simple Test with Debug Partition")
     print("-" * 40)
@@ -166,6 +167,7 @@ def main():
     print("=" * 50)
 
     return True
+
 
 
 if __name__ == "__main__":

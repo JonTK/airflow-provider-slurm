@@ -21,6 +21,7 @@ from tests.utils.cluster_helpers import (
 _CLIENT = None
 
 
+
 def create_api_client():
     """Create API client with real token from cluster."""
     global _CLIENT
