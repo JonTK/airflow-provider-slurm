@@ -50,7 +50,7 @@ def can_reach_cluster(host: str, port: int, timeout: int = 5) -> bool:
         sock.close()
         logger.info(f"Successfully reached {host}:{port}")
         return True
-    except (socket.timeout, socket.error, OSError) as e:
+    except (socket.timeout, OSError) as e:
         logger.debug(f"Cannot reach {host}:{port}: {e}")
         return False
 

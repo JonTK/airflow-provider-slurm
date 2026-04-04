@@ -433,10 +433,10 @@ echo "Dependent job complete"
     # ============================================================================
 
     # Run patterns independently
-    pattern1_result = linear_pipeline()
-    pattern2_result = conditional_execution()
-    pattern3_result = fan_out_fan_in()
-    pattern4_result = array_dependencies()
+    linear_pipeline()
+    conditional_execution()
+    fan_out_fan_in()
+    array_dependencies()
 
     # Pattern 5: Dynamic dependencies with XCom
     base_id = submit_base_job()

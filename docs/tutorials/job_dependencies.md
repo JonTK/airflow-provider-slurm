@@ -824,5 +824,5 @@ Job dependencies provide powerful workflow control:
 
 For more information, see:
 - [Slurm Documentation: Job Dependencies](https://slurm.schedmd.com/sbatch.html#OPT_dependency)
-- [Job Arrays Tutorial](job_arrays.md)
-- [SlurmOperator API Reference](../api/operators.md)
+- [Job Arrays Tutorial](../job_arrays.md)
+- [Configuration Guide](../configuration.md)

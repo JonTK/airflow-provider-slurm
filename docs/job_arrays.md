@@ -479,4 +479,4 @@ results = process_workload(num_tasks)
 
 - [Slurm Array Documentation](https://slurm.schedmd.com/job_array.html)
 - [Configuration Guide](configuration.md)
-- [API Reference](api_reference.md)
+- [Troubleshooting](troubleshooting.md)
