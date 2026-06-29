@@ -33,7 +33,7 @@ jobs:
     continue-on-error: ${{ matrix.experimental || false }}
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v6
@@ -41,7 +41,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Cache pip dependencies
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ matrix.airflow-version }}-${{ hashFiles('requirements-dev.txt', 'setup.py') }}
@@ -82,7 +82,7 @@ jobs:
         pytest tests/unit/ --cov=airflow_provider_slurm --cov-report=xml --cov-report=term-missing --cov-report=html --junitxml=pytest-results.xml
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@v7
       with:
         file: ./coverage.xml
         flags: unittests
@@ -111,7 +111,7 @@ jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: Set up Python
       uses: actions/setup-python@v6
@@ -126,7 +126,7 @@ jobs:
     needs: test
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: Set up Python 3.10
       uses: actions/setup-python@v6
